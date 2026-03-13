@@ -387,12 +387,12 @@ function extractFrames(videoEl, count=40) {
     };
     videoEl.onseeked = () => {
       try {
-        const s = Math.min(480/videoEl.videoWidth, 360/videoEl.videoHeight, 1);
+        const s = Math.min(400/videoEl.videoWidth, 300/videoEl.videoHeight, 1);
         canvas.width  = Math.round(videoEl.videoWidth * s);
         canvas.height = Math.round(videoEl.videoHeight * s);
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.70);
         frames.push({dataUrl, base64:dataUrl.split(',')[1], time:merged[idx], idx});
       } catch(e) {/* skip */}
       idx++; next();
@@ -467,12 +467,13 @@ async function classifyKeyFrames(apiKey, frames) {
 
 async function analyzeSwing(apiKey, keyFrameIdx, frames, poseData, skeletonUrls) {
   // 스켈레톤 오버레이 이미지 또는 원본 이미지 사용
+  // 원본 프레임 사용 (스켈레톤 오버레이는 크기가 커서 제외)
   const imgContent = PHASE_KEYS.flatMap((k,i) => {
-    const url = skeletonUrls[k] || frames[keyFrameIdx[k]]?.dataUrl;
-    if (!url) return [];
+    const f = frames[keyFrameIdx[k]];
+    if (!f) return [];
     return [
-      {type:'text', text:`[${PHASE_EMOJI[i]} ${PHASES[i]}]`},
-      {type:'image', source:{type:'base64', media_type:'image/jpeg', data:url.split(',')[1]}}
+      {type:'text', text:'['+PHASE_EMOJI[i]+' '+PHASES[i]+']'},
+      {type:'image', source:{type:'base64', media_type:'image/jpeg', data:f.base64}}
     ];
   });
 
@@ -1232,7 +1233,7 @@ function App() {
 
   /* STEP 2: AI 분류 */
   const doClassify = async () => {
-    if (!apiKey) { setError('API 키를 입력해주세요'); return; }
+    if (!apiKey) { setError('API 키를 입력해주세요'); setStep(2); return; }
     setError(''); setLoadMsg('Claude Vision이 스윙 구간 분류 중…');
     try {
       const kf = await classifyKeyFrames(apiKey, frames);
@@ -1281,9 +1282,9 @@ function App() {
     setProgMsg('');
     setPoseProgress(100);
 
-    // 관절분석 완료 → 즉시 Claude 분석 (로컬 변수 직접 전달로 state 비동기 문제 회피)
+    // 관절분석 완료 → Claude 분석
     setTimeout(async () => {
-      if (!apiKey) { setError('API 키를 입력해주세요'); return; }
+      if (!apiKey) { setError('API 키를 입력해주세요'); setStep(2); return; }
       setStep(4); setLoadMsg('Claude Vision + 관절수치 종합 분석 중…');
       try {
         const res = await analyzeSwing(apiKey, keyFrameIdx, frames, newPoseData, newSkeletonUrls);
@@ -1296,8 +1297,8 @@ function App() {
             poseData:newPoseData,thumb:_thumb,
             summary:res.summary||'',critical:res.critical||[]}));
         });
-      } catch(e) { setError('분석 실패: '+e.message); setStep(3); setLoadMsg(''); }
-    }, 500);
+      } catch(e) { setError('❌ 분석 실패: '+e.message); setStep(2); setLoadMsg(''); }
+    }, 100);
   };
 
   const reset = () => {
@@ -1589,6 +1590,22 @@ function App() {
                 ) : null;
               })}
             </div>
+
+            {/* 에러 발생 시 재시도 안내 */}
+            {error && (
+              <div className="fade-up" style={{marginTop:20,padding:'12px 16px',borderRadius:10,
+                background:'rgba(239,68,68,.1)',border:'1px solid rgba(239,68,68,.3)',
+                color:'#f87171',fontSize:13,textAlign:'center',maxWidth:480,margin:'20px auto 0'}}>
+                {error}
+                <div style={{marginTop:8}}>
+                  <button onClick={()=>{setError('');setStep(2);}}
+                    style={{padding:'6px 18px',borderRadius:8,background:'var(--red)',border:'none',
+                      color:'#fff',fontSize:12,fontWeight:700,cursor:'pointer'}}>
+                    ← 키프레임 선택으로 돌아가기
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
