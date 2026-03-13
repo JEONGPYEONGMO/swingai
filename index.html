@@ -361,27 +361,40 @@ function drawSkeletonOverlay(originalDataUrl, landmarks, metrics, phaseColor) {
 /* ═══════════════════════════════════════════════
    프레임 추출
 ═══════════════════════════════════════════════ */
-function extractFrames(videoEl, count=20) {
+function extractFrames(videoEl, count=40) {
   return new Promise((resolve, reject) => {
     const dur = videoEl.duration;
     if (!dur || isNaN(dur)) { reject(new Error('동영상 길이를 읽을 수 없습니다')); return; }
-    const margin = dur*0.04, usable = dur-margin*2;
-    const times  = Array.from({length:count}, (_,i) => margin + usable*i/(count-1));
+    const margin = dur * 0.03;
+    const usable = dur - margin * 2;
+
+    // 균등 24개 + 스윙 핵심구간(35~72%) 집중 16개 → 중복 제거 후 정렬
+    const uniform = Array.from({length:24}, (_,i) => margin + usable * i / 23);
+    const swingS  = margin + usable * 0.35;
+    const swingE  = margin + usable * 0.72;
+    const focused = Array.from({length:16}, (_,i) => swingS + (swingE - swingS) * i / 15);
+    const merged  = [...new Set([...uniform, ...focused].map(t => Math.round(t*1000)))]
+                      .sort((a,b) => a-b)
+                      .map(t => t/1000);
+
     const canvas = document.createElement('canvas');
     const ctx    = canvas.getContext('2d');
     const frames = [];
     let idx = 0;
-    const next = () => { if (idx>=times.length){resolve(frames);return;} videoEl.currentTime=times[idx]; };
+    const next = () => {
+      if (idx >= merged.length) { resolve(frames); return; }
+      videoEl.currentTime = merged[idx];
+    };
     videoEl.onseeked = () => {
       try {
         const s = Math.min(480/videoEl.videoWidth, 360/videoEl.videoHeight, 1);
-        canvas.width  = Math.round(videoEl.videoWidth*s);
-        canvas.height = Math.round(videoEl.videoHeight*s);
-        ctx.clearRect(0,0,canvas.width,canvas.height);
-        ctx.drawImage(videoEl,0,0,canvas.width,canvas.height);
-        const dataUrl = canvas.toDataURL('image/jpeg',0.82);
-        frames.push({dataUrl, base64:dataUrl.split(',')[1], time:times[idx], idx});
-      } catch(e){/* skip */}
+        canvas.width  = Math.round(videoEl.videoWidth * s);
+        canvas.height = Math.round(videoEl.videoHeight * s);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+        frames.push({dataUrl, base64:dataUrl.split(',')[1], time:merged[idx], idx});
+      } catch(e) {/* skip */}
       idx++; next();
     };
     videoEl.onerror = reject;
@@ -424,16 +437,17 @@ async function callClaude(apiKey, messages, maxTokens=1600) {
 
 async function classifyKeyFrames(apiKey, frames) {
   const step    = Math.max(1, Math.floor(frames.length/12));
-  const samples = frames.filter((_,i)=>i%step===0).slice(0,12);
+  const samples = frames.filter((_,i)=>i%step===0).slice(0,16);
   const idxMap  = samples.map(f=>f.idx);
   const content = [
     {type:'text', text:
 `골프 스윙 프레임 ${samples.length}개(번호 0~${samples.length-1}).
-4단계 해당 번호를 순수 JSON으로 출력:
-- address: 백스윙 전 어드레스 자세
-- top: 백스윙 최고점
-- impact: 임팩트 순간
-- follow: 팔로우스루/피니시
+각 단계에 가장 부합하는 프레임 번호를 JSON으로 출력:
+- address: 어드레스 — 클럽이 지면 근처, 양발 벌림, 상체 전경
+- top: 백스윙 탑 — 클럽헤드 최고점, 왼팔 수평 이상
+- impact: 임팩트 — 클럽이 볼 위치(지면)에 가장 가까운 순간, 체중이 왼쪽으로 이동 시작, 팔이 몸 앞 최대한 낮은 위치
+- follow: 팔로우스루/피니시 — 클럽이 머리 위로 올라간 완성 자세
+★ impact는 가장 중요합니다. 클럽헤드가 지면에 가장 가까운 프레임을 선택하세요.
 형식(숫자만): {"address":0,"top":4,"impact":7,"follow":10}`},
     ...samples.flatMap((f,i)=>[
       {type:'text',text:`[프레임 ${i}]`},
@@ -470,27 +484,45 @@ async function analyzeSwing(apiKey, keyFrameIdx, frames, poseData, skeletonUrls)
   }).join('\n');
 
   const prompt =
-`PGA 투어 수준 골프 코치 + 인간공학(HFE) 전문가로서 분석하세요.
+`당신은 PGA 투어 스윙 코치 + 인간공학(HFE) 전문가입니다. 아래 이미지와 관절 수치를 보고 스윙을 채점하세요.
 
-【MediaPipe 관절 측정값】
+【채점 기준 — 반드시 준수】
+- PGA/LPGA 투어 선수 수준: 88~100점
+- 싱글 핸디캡(0~9): 74~87점
+- 일반 아마추어(10~20): 55~73점
+- 초보(20타 이상): 54점 이하
+- 각 도메인은 독립 채점. 잘 된 항목은 과감하게 높게 주세요.
+- MediaPipe 수치가 없거나 불확실하면 이미지 시각 분석을 우선하세요.
+
+【MediaPipe 관절 측정값 (참고용)】
 ${metricsText}
 
-【분석 도메인】
-1. spine(척추/자세): 전경각, 역스파인, X-Factor 회전분리
-2. grip(그립/손목): 그립타입, 코킹타이밍, 임팩트릴리즈
-3. lower(하체/이동): 무릎굴곡유지, 체중이동, 힙클리어링
-4. finish(팔로우스루): 완성도, 피니시균형, 벨트버클정렬
+【채점 도메인】
+1. spine(척추/자세): 어드레스 전경각, 백스윙 회전축 유지, X-Factor, 임팩트 C자
+2. grip(그립/손목): 그립 타입 일관성, 코킹 타이밍, 임팩트 릴리즈 속도
+3. lower(하체/이동): 무릎 굴곡 유지, 체중 이동 시퀀스, 힙 클리어링
+4. finish(팔로우스루): 피니시 완성도, 균형, 벨트버클 타겟 정렬
 
-관절 수치를 반드시 피드백에 인용하세요.
-순수 JSON만 출력 (마크다운 없이):
-{"scores":{"spine":75,"grip":80,"lower":65,"finish":70},"critical":[{"title":"항목","desc":"수치 인용한 상세설명","phase":"어드레스"}],"important":[{"title":"항목","desc":"설명","phase":"탑"}],"optional":[{"title":"항목","desc":"설명","phase":"임팩트"}],"goodPoints":["잘된점1","잘된점2"],"drillTitle":"드릴이름","drillDesc":"구체적방법(횟수/세트)","summary":"수치 포함 2~3문장 종합평가"}
-규칙: critical 1~2개, important 2~3개, optional 1~2개, goodPoints 1~2개, 전부 한국어.`;
+【출력 규칙】
+- 순수 JSON만 출력 (마크다운 없이)
+- critical: 실제로 교정이 필요한 경우만 0~2개 (잘 된 스윙은 0개 가능)
+- important: 1~3개, optional: 0~2개
+- goodPoints: 잘 된 점 반드시 2~4개 (프로 스윙이면 4개 이상)
+- 수치가 있으면 피드백에 인용, 없으면 시각 묘사로 대체
+- 전부 한국어
+
+{"scores":{"spine":92,"grip":90,"lower":94,"finish":91},"critical":[],"important":[{"title":"항목","desc":"설명","phase":"탑"}],"optional":[{"title":"항목","desc":"설명","phase":"임팩트"}],"goodPoints":["잘된점1","잘된점2","잘된점3"],"drillTitle":"드릴이름","drillDesc":"구체적방법(횟수/세트)","summary":"2~3문장 종합평가"}`;
 
   const raw = await callClaude(apiKey, [{
     role:'user',
     content:[{type:'text',text:prompt}, ...imgContent, {type:'text',text:'JSON으로 출력:'}]
-  }], 1800);
-  return extractJSON(raw);
+  }], 2400);
+    // totalScore 없으면 평균 계산해서 주입
+  if (result && result.scores && !result.totalScore) {
+    const vals = Object.values(result.scores).filter(v => typeof v === 'number');
+    result.totalScore = vals.length ? Math.round(vals.reduce((a,b)=>a+b,0)/vals.length) : 0;
+  }
+  return result;
 }
 
 /* ═══════════════════════════════════════════════
@@ -1187,7 +1219,7 @@ function App() {
     try {
       let p=0;
       const t = setInterval(()=>{ p=Math.min(p+4,88); setProgPct(p); },150);
-      const extracted = await extractFrames(vid, 20);
+      const extracted = await extractFrames(vid, 40);
       clearInterval(t); setProgPct(100);
       if (!extracted.length) throw new Error('추출된 프레임이 없습니다');
       setFrames(extracted);
