@@ -1,0 +1,1938 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>⛳ SwingAI Phase 3 — 프로 레퍼런스</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=JetBrains+Mono:wght@400;600&family=Bebas+Neue&display=swap" rel="stylesheet">
+<!-- MediaPipe Pose -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+<!-- React + Chart.js -->
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Noto Sans KR',sans-serif;background:#080e18;color:#e2eaf4;min-height:100vh}
+:root{
+  --bg:#080e18;--s1:#0d1520;--s2:#131d2a;--bd:#1e3048;
+  --green:#22c55e;--cyan:#06b6d4;--amber:#f59e0b;--red:#ef4444;--purple:#a855f7;
+  --muted:#6b8aaa;--dim:#4a6a8a;
+}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-thumb{background:var(--bd);border-radius:2px}
+@keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+@keyframes scanline{0%{top:-8%}100%{top:108%}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes fillBar{from{width:0}to{width:var(--w)}}
+.fade-up{animation:fadeUp .35s ease both}
+.pulse-dot{animation:pulse 1.5s ease infinite}
+.spinner{animation:spin 1s linear infinite;border:2px solid transparent;border-top-color:var(--green);border-radius:50%;display:inline-block}
+.glass{background:rgba(13,21,32,.85);backdrop-filter:blur(10px);border:1px solid var(--bd)}
+.card{background:var(--s1);border:1px solid var(--bd);border-radius:12px;padding:20px 22px}
+.drop-zone{border:2px dashed var(--bd);border-radius:16px;transition:all .2s;cursor:pointer}
+.drop-zone:hover{border-color:var(--green);background:rgba(34,197,94,.04)}
+.drop-over{border-color:var(--green)!important;background:rgba(34,197,94,.06)!important}
+.step-line{flex:1;height:2px;background:var(--bd);transition:background .4s;margin:0 4px}
+.step-line.done{background:var(--green)}
+.frame-thumb{border:2px solid transparent;border-radius:6px;overflow:hidden;cursor:pointer;transition:border-color .15s;position:relative;aspect-ratio:4/3}
+.frame-thumb:hover{border-color:rgba(34,197,94,.5)}
+.frame-thumb.sel{border-color:var(--green)}
+.fb-critical{border-left:3px solid var(--red);background:rgba(239,68,68,.05)}
+.fb-important{border-left:3px solid var(--amber);background:rgba(245,158,11,.05)}
+.fb-optional{border-left:3px solid #3b82f6;background:rgba(59,130,246,.05)}
+.fb-good{border-left:3px solid var(--green);background:rgba(34,197,94,.05)}
+.fb-drill{border-left:3px solid var(--purple);background:rgba(168,85,247,.05)}
+.scan-wrap{position:relative;overflow:hidden}
+.scan-line{position:absolute;width:100%;height:2px;background:linear-gradient(90deg,transparent,rgba(34,197,94,.7),transparent);animation:scanline 1.8s ease-in-out infinite;left:0;pointer-events:none}
+.prog-track{height:6px;background:var(--bd);border-radius:9999px;overflow:hidden}
+.prog-fill{height:100%;background:linear-gradient(90deg,var(--green),#4ade80);border-radius:9999px;transition:width .3s ease}
+.phase-tab{padding:7px 14px;border-radius:6px;font-size:12px;cursor:pointer;border:1px solid var(--bd);background:var(--s2);color:var(--muted);transition:all .15s;font-family:'Noto Sans KR',sans-serif}
+.metric-bar-track{height:8px;background:var(--bd);border-radius:9999px;position:relative;overflow:hidden}
+.metric-bar-ideal{position:absolute;top:0;height:100%;background:rgba(34,197,94,.2);border-radius:9999px}
+.metric-bar-fill{position:absolute;top:0;left:0;height:100%;border-radius:9999px;transition:width 1s ease}
+.metric-bar-marker{position:absolute;top:-3px;width:14px;height:14px;border-radius:50%;border:2px solid var(--bg);transform:translateX(-50%);transition:left 1s ease}
+.tag-mp{font-size:10px;padding:2px 7px;border-radius:4px;font-family:'JetBrains Mono',monospace;background:rgba(6,182,212,.15);color:var(--cyan);border:1px solid rgba(6,182,212,.3)}
+
+@media(max-width:640px){
+  .ntab{padding:6px 10px;font-size:11px;gap:3px}
+  .card{padding:14px 14px}
+  .frame-thumb{border-radius:4px}
+}
+@media print{header{position:static!important}.no-print{display:none!important}}
+
+.ntab{display:inline-flex;align-items:center;gap:5px;padding:8px 16px;border-radius:8px;
+  font-size:12px;font-weight:600;cursor:pointer;border:1px solid transparent;
+  background:transparent;color:var(--muted);transition:all .2s;
+  font-family:'Noto Sans KR',sans-serif;white-space:nowrap}
+.ntab.on{background:rgba(34,197,94,.1);border-color:rgba(34,197,94,.35);color:var(--green)}
+.ntab:not(.on):hover{color:#e2eaf4;background:rgba(255,255,255,.05)}
+.hcard{background:var(--s1);border:1px solid var(--bd);border-radius:12px;overflow:hidden;
+  cursor:pointer;transition:all .2s}
+.hcard:hover{border-color:rgba(34,197,94,.35);transform:translateY(-2px)}
+.hcard.sa{border-color:#22c55e;box-shadow:0 0 0 2px rgba(34,197,94,.25)}
+.hcard.sb{border-color:#06b6d4;box-shadow:0 0 0 2px rgba(6,182,212,.25)}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useRef, useEffect, useCallback } = React;
+const isMob = () => window.innerWidth < 640;
+
+/* ─── PRO_DB ─── */
+const PRO_DB = {
+  tiger:{name:'타이거 우즈',emoji:'🐯',era:'2000s peak',color:'#f59e0b',
+    desc:'완벽한 X-Factor와 힙 클리어링, 역C자 임팩트의 표본',
+    scores:{spine:97,grip:96,lower:98,finish:95},
+    metrics:{
+      address:{spineAngle:38,leftKnee:168,rightKnee:166,xFactor:0,leftElbow:172,shoulderTilt:4},
+      top:    {spineAngle:40,leftKnee:160,rightKnee:162,xFactor:52,leftElbow:178,shoulderTilt:8},
+      impact: {spineAngle:36,leftKnee:172,rightKnee:178,xFactor:38,leftElbow:175,shoulderTilt:6},
+      follow: {spineAngle:18,leftKnee:165,rightKnee:170,xFactor:10,leftElbow:148,shoulderTilt:12}}},
+  rory:{name:'로리 맥길로이',emoji:'🦅',era:'2020s',color:'#06b6d4',
+    desc:'폭발적 X-Factor와 최고의 하체 드라이브',
+    scores:{spine:95,grip:93,lower:96,finish:94},
+    metrics:{
+      address:{spineAngle:36,leftKnee:170,rightKnee:168,xFactor:0,leftElbow:174,shoulderTilt:3},
+      top:    {spineAngle:38,leftKnee:162,rightKnee:164,xFactor:55,leftElbow:180,shoulderTilt:7},
+      impact: {spineAngle:34,leftKnee:174,rightKnee:176,xFactor:42,leftElbow:178,shoulderTilt:5},
+      follow: {spineAngle:16,leftKnee:168,rightKnee:172,xFactor:8,leftElbow:145,shoulderTilt:10}}},
+  annika:{name:'아니카 소렌스탐',emoji:'👑',era:'LPGA 레전드',color:'#a855f7',
+    desc:'교과서적 반복 스윙과 균형잡힌 팔로우스루',
+    scores:{spine:94,grip:95,lower:93,finish:96},
+    metrics:{
+      address:{spineAngle:34,leftKnee:172,rightKnee:170,xFactor:0,leftElbow:176,shoulderTilt:2},
+      top:    {spineAngle:36,leftKnee:164,rightKnee:166,xFactor:48,leftElbow:176,shoulderTilt:6},
+      impact: {spineAngle:33,leftKnee:175,rightKnee:177,xFactor:36,leftElbow:180,shoulderTilt:4},
+      follow: {spineAngle:20,leftKnee:167,rightKnee:169,xFactor:12,leftElbow:150,shoulderTilt:9}}},
+  pga:{name:'PGA 투어 평균',emoji:'📊',era:'현재 기준',color:'#22c55e',
+    desc:'현 PGA 투어 선수들의 평균 생체역학 수치',
+    scores:{spine:82,grip:80,lower:83,finish:81},
+    metrics:{
+      address:{spineAngle:37,leftKnee:167,rightKnee:165,xFactor:0,leftElbow:173,shoulderTilt:4},
+      top:    {spineAngle:39,leftKnee:161,rightKnee:163,xFactor:46,leftElbow:177,shoulderTilt:7},
+      impact: {spineAngle:35,leftKnee:173,rightKnee:175,xFactor:39,leftElbow:176,shoulderTilt:5},
+      follow: {spineAngle:19,leftKnee:166,rightKnee:170,xFactor:11,leftElbow:148,shoulderTilt:11}}},
+};
+
+/* ─── history ─── */
+const HK = 'swingai_h3';
+function hLoad(){try{return JSON.parse(localStorage.getItem(HK)||'[]');}catch(e){return[];}}
+function hSave(e2){const h=[e2,...hLoad()].slice(0,20);localStorage.setItem(HK,JSON.stringify(h));return h;}
+function hDel(id){const h=hLoad().filter(x=>x.id!==id);localStorage.setItem(HK,JSON.stringify(h));return h;}
+function hClear(){localStorage.removeItem(HK);return[];}
+function makeThumbnail(url){
+  return new Promise(res=>{
+    if(!url){res(null);return;}
+    const img=new Image();
+    img.onload=()=>{const c=document.createElement('canvas');const s=140/img.width;
+      c.width=140;c.height=Math.round(img.height*s);
+      c.getContext('2d').drawImage(img,0,0,c.width,c.height);res(c.toDataURL('image/jpeg',.5));};
+    img.onerror=()=>res(null);
+    img.src=url;
+  });
+}
+
+/* ═══════════════════════════════════════════════
+   CONSTANTS
+═══════════════════════════════════════════════ */
+const PHASES      = ['어드레스','탑','임팩트','팔로우스루'];
+const PHASE_KEYS  = ['address','top','impact','follow'];
+const PHASE_EMOJI = ['🏌️','⬆️','💥','🔄'];
+const PHASE_COLOR = ['#22c55e','#06b6d4','#f59e0b','#a855f7'];
+const DOMAIN = {
+  spine:  {color:'#22c55e', label:'척추/자세',   icon:'🦴'},
+  grip:   {color:'#06b6d4', label:'그립/손목',   icon:'✋'},
+  lower:  {color:'#f59e0b', label:'하체/이동',   icon:'🦵'},
+  finish: {color:'#a855f7', label:'팔로우스루',  icon:'🏌️'},
+};
+
+// MediaPipe 33 landmark 연결선 (골프 핵심 부위)
+const POSE_CONNECTIONS = [
+  [11,12],[11,23],[12,24],[23,24],          // 몸통
+  [11,13],[13,15],[12,14],[14,16],          // 팔
+  [15,17],[15,19],[15,21],[17,19],          // 왼손
+  [16,18],[16,20],[16,22],[18,20],          // 오른손
+  [23,25],[25,27],[27,29],[27,31],[29,31],  // 왼다리
+  [24,26],[26,28],[28,30],[28,32],[30,32],  // 오른다리
+  [0,1],[1,2],[2,3],[3,7],                  // 얼굴
+  [0,4],[4,5],[5,6],[6,8],[9,10],
+];
+
+// 골프 스윙 정상 범위
+const METRIC_RANGES = {
+  spineAngle:      {min:0,  max:60,  idealMin:32, idealMax:48, unit:'°',  label:'척추 전경각',   hint:'어드레스: 35~45° 권장'},
+  leftKnee:        {min:130,max:180, idealMin:155,idealMax:175,unit:'°',  label:'왼쪽 무릎각',  hint:'굴곡 유지: 155~175°'},
+  rightKnee:       {min:130,max:180, idealMin:155,idealMax:175,unit:'°',  label:'오른쪽 무릎각',hint:'굴곡 유지: 155~175°'},
+  xFactor:         {min:0,  max:80,  idealMin:35, idealMax:55, unit:'°',  label:'X-Factor(힙-숄더)',hint:'탑: 35~55° 이상적'},
+  leftElbow:       {min:90, max:180, idealMin:155,idealMax:180,unit:'°',  label:'왼팔꿈치각',   hint:'임팩트: 155~180° 직선'},
+  shoulderTilt:    {min:0,  max:30,  idealMin:0,  idealMax:10, unit:'°',  label:'어깨 기울기',  hint:'좌우 기울기 최소화'},
+};
+
+/* ═══════════════════════════════════════════════
+   MEDIAPIPE 초기화 & 관절 분석
+═══════════════════════════════════════════════ */
+let poseInstance = null;
+let poseCallback = null;
+let mpReady = false;
+let mpFailed = false;
+
+async function initMediaPipe() {
+  if (typeof Pose === 'undefined') { mpFailed = true; return false; }
+  try {
+    poseInstance = new Pose({
+      locateFile: f => 'https://cdn.jsdelivr.net/npm/@mediapipe/pose/' + f
+    });
+    poseInstance.setOptions({
+      modelComplexity: 1,
+      smoothLandmarks: false,
+      enableSegmentation: false,
+      minDetectionConfidence: 0.5,
+      minTrackingConfidence: 0.5,
+    });
+    poseInstance.onResults(results => {
+      if (poseCallback) { poseCallback(results); poseCallback = null; }
+    });
+    // WASM 모델 완전 로드 대기
+    await poseInstance.initialize();
+    mpReady = true;
+    return true;
+  } catch(e) {
+    console.warn('MediaPipe init failed:', e);
+    mpFailed = true;
+    return false;
+  }
+}
+
+function getPoseLandmarks(dataUrl) {
+  return new Promise((resolve) => {
+    if (!poseInstance || mpFailed || !mpReady) { resolve(null); return; }
+    const timeout = setTimeout(() => { poseCallback = null; resolve(null); }, 15000);
+    poseCallback = results => {
+      clearTimeout(timeout);
+      resolve(results.poseLandmarks || null);
+    };
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => poseInstance.send({image: img}).catch(e2 => {
+      clearTimeout(timeout); poseCallback = null; resolve(null);
+    });
+    img.onerror = () => { clearTimeout(timeout); poseCallback = null; resolve(null); };
+    img.src = dataUrl;
+  });
+}
+
+/* ── 각도 계산 유틸 ── */
+function calcAngle(a, b, c) {
+  const v1 = { x: a.x-b.x, y: a.y-b.y };
+  const v2 = { x: c.x-b.x, y: c.y-b.y };
+  const dot = v1.x*v2.x + v1.y*v2.y;
+  const mag = Math.hypot(v1.x,v1.y) * Math.hypot(v2.x,v2.y);
+  if (mag === 0) return 0;
+  return Math.acos(Math.max(-1, Math.min(1, dot/mag))) * 180/Math.PI;
+}
+
+function extractMetrics(lm) {
+  if (!lm || lm.length < 33) return null;
+  const midX = (a,b) => (lm[a].x+lm[b].x)/2;
+  const midY = (a,b) => (lm[a].y+lm[b].y)/2;
+
+  // 척추 전경각 (수평에서 얼마나 앞으로 기울었는지)
+  const shoulderMidX = midX(11,12), shoulderMidY = midY(11,12);
+  const hipMidX      = midX(23,24), hipMidY      = midY(23,24);
+  const spineAngle   = Math.abs(Math.atan2(shoulderMidX-hipMidX, -(shoulderMidY-hipMidY)) * 180/Math.PI);
+
+  // 무릎 굴곡각 (180°=완전 신전)
+  const leftKnee  = calcAngle(lm[23], lm[25], lm[27]);
+  const rightKnee = calcAngle(lm[24], lm[26], lm[28]);
+
+  // X-Factor: 어깨라인과 힙라인 회전 차이
+  const shoulderAngle = Math.atan2(lm[12].y-lm[11].y, lm[12].x-lm[11].x) * 180/Math.PI;
+  const hipAngle      = Math.atan2(lm[24].y-lm[23].y, lm[24].x-lm[23].x) * 180/Math.PI;
+  const xFactor       = Math.abs(shoulderAngle - hipAngle);
+
+  // 왼팔꿈치 각도
+  const leftElbow = calcAngle(lm[11], lm[13], lm[15]);
+
+  // 어깨 기울기 (좌우)
+  const shoulderTilt = Math.abs(Math.atan2(lm[12].y-lm[11].y, lm[12].x-lm[11].x) * 180/Math.PI);
+
+  return {
+    spineAngle:   Math.round(spineAngle*10)/10,
+    leftKnee:     Math.round(leftKnee*10)/10,
+    rightKnee:    Math.round(rightKnee*10)/10,
+    xFactor:      Math.round(Math.min(xFactor,75)*10)/10,
+    leftElbow:    Math.round(leftElbow*10)/10,
+    shoulderTilt: Math.round(Math.min(shoulderTilt,30)*10)/10,
+  };
+}
+
+/* ── 스켈레톤 오버레이 그리기 → dataUrl 반환 ── */
+function drawSkeletonOverlay(originalDataUrl, landmarks, metrics, phaseColor) {
+  return new Promise((resolve) => {
+    if (!landmarks) { resolve(originalDataUrl); return; }
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width  = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+
+      const px = lm => ({ x: lm.x * canvas.width, y: lm.y * canvas.height });
+      const color  = phaseColor || '#22c55e';
+      const dimCol = 'rgba(255,255,255,.25)';
+
+      // 연결선
+      ctx.lineWidth = Math.max(2, canvas.width/300);
+      POSE_CONNECTIONS.forEach(([i,j]) => {
+        const a = landmarks[i], b = landmarks[j];
+        if (!a || !b) return;
+        const vis = Math.min(a.visibility||1, b.visibility||1);
+        if (vis < 0.25) return;
+        const pa = px(a), pb = px(b);
+        ctx.globalAlpha = Math.min(1, vis * 1.2);
+        ctx.strokeStyle = color;
+        ctx.beginPath();
+        ctx.moveTo(pa.x, pa.y);
+        ctx.lineTo(pb.x, pb.y);
+        ctx.stroke();
+      });
+
+      // 관절 점
+      ctx.globalAlpha = 1;
+      landmarks.forEach((lm) => {
+        if ((lm.visibility||1) < 0.25) return;
+        const p = px(lm);
+        const r = Math.max(3, canvas.width/160);
+        ctx.beginPath();
+        ctx.fillStyle = '#fff';
+        ctx.arc(p.x, p.y, r+1, 0, Math.PI*2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.fillStyle = color;
+        ctx.arc(p.x, p.y, r, 0, Math.PI*2);
+        ctx.fill();
+      });
+
+      // 수치 라벨
+      if (metrics) {
+        const fs   = Math.max(11, canvas.width/45);
+        const pad  = fs*0.4;
+        const drawLabel = (x, y, text, col) => {
+          ctx.font      = `bold ${fs}px 'JetBrains Mono',monospace`;
+          const w       = ctx.measureText(text).width;
+          ctx.fillStyle = 'rgba(0,0,0,.72)';
+          ctx.fillRect(x-pad, y-fs, w+pad*2, fs+pad*1.5);
+          ctx.fillStyle = col || '#f59e0b';
+          ctx.fillText(text, x, y);
+        };
+
+        const hipMidX = (landmarks[23].x+landmarks[24].x)/2 * canvas.width;
+        const hipMidY = (landmarks[23].y+landmarks[24].y)/2 * canvas.height;
+        drawLabel(hipMidX+8, hipMidY-8, `척추 ${metrics.spineAngle}°`, '#f59e0b');
+
+        const lKneeX = landmarks[25].x * canvas.width;
+        const lKneeY = landmarks[25].y * canvas.height;
+        drawLabel(lKneeX+8, lKneeY, `무릎L ${metrics.leftKnee}°`, '#06b6d4');
+
+        const rKneeX = landmarks[26].x * canvas.width;
+        const rKneeY = landmarks[26].y * canvas.height;
+        drawLabel(rKneeX+8, rKneeY, `무릎R ${metrics.rightKnee}°`, '#06b6d4');
+
+        if ((landmarks[13].visibility||1) > 0.3) {
+          const elbX = landmarks[13].x * canvas.width;
+          const elbY = landmarks[13].y * canvas.height;
+          drawLabel(elbX+8, elbY, `팔꿈치 ${metrics.leftElbow}°`, '#a855f7');
+        }
+      }
+
+      resolve(canvas.toDataURL('image/jpeg', 0.88));
+    };
+    img.onerror = () => resolve(originalDataUrl);
+    img.src = originalDataUrl;
+  });
+}
+
+/* ═══════════════════════════════════════════════
+   프레임 추출
+═══════════════════════════════════════════════ */
+function extractFrames(videoEl, count=20) {
+  return new Promise((resolve, reject) => {
+    const dur = videoEl.duration;
+    if (!dur || isNaN(dur)) { reject(new Error('동영상 길이를 읽을 수 없습니다')); return; }
+    const margin = dur*0.04, usable = dur-margin*2;
+    const times  = Array.from({length:count}, (_,i) => margin + usable*i/(count-1));
+    const canvas = document.createElement('canvas');
+    const ctx    = canvas.getContext('2d');
+    const frames = [];
+    let idx = 0;
+    const next = () => { if (idx>=times.length){resolve(frames);return;} videoEl.currentTime=times[idx]; };
+    videoEl.onseeked = () => {
+      try {
+        const s = Math.min(480/videoEl.videoWidth, 360/videoEl.videoHeight, 1);
+        canvas.width  = Math.round(videoEl.videoWidth*s);
+        canvas.height = Math.round(videoEl.videoHeight*s);
+        ctx.clearRect(0,0,canvas.width,canvas.height);
+        ctx.drawImage(videoEl,0,0,canvas.width,canvas.height);
+        const dataUrl = canvas.toDataURL('image/jpeg',0.82);
+        frames.push({dataUrl, base64:dataUrl.split(',')[1], time:times[idx], idx});
+      } catch(e){/* skip */}
+      idx++; next();
+    };
+    videoEl.onerror = reject;
+    next();
+  });
+}
+
+/* ═══════════════════════════════════════════════
+   JSON 추출 (중첩 구조 안전 파싱)
+═══════════════════════════════════════════════ */
+function extractJSON(text) {
+  const clean = text.replace(/```json\s*/gi,'').replace(/```\s*/g,'').trim();
+  const start = clean.indexOf('{');
+  if (start===-1) throw new Error('JSON 시작 괄호({) 없음');
+  let depth=0;
+  for (let i=start;i<clean.length;i++) {
+    if (clean[i]==='{') depth++;
+    else if (clean[i]==='}') { depth--; if(depth===0) return JSON.parse(clean.slice(start,i+1)); }
+  }
+  throw new Error('JSON 파싱 실패');
+}
+
+/* ═══════════════════════════════════════════════
+   CLAUDE API
+═══════════════════════════════════════════════ */
+async function callClaude(apiKey, messages, maxTokens=1600) {
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method:'POST',
+    headers:{
+      'Content-Type':'application/json',
+      'x-api-key':apiKey,
+      'anthropic-version':'2023-06-01',
+      'anthropic-dangerous-direct-browser-access':'true'
+    },
+    body: JSON.stringify({model:'claude-opus-4-5', max_tokens:maxTokens, messages})
+  });
+  if (!res.ok) { const e=await res.json(); throw new Error(e.error?.message||`API Error ${res.status}`); }
+  return (await res.json()).content[0].text;
+}
+
+async function classifyKeyFrames(apiKey, frames) {
+  const step    = Math.max(1, Math.floor(frames.length/12));
+  const samples = frames.filter((_,i)=>i%step===0).slice(0,12);
+  const idxMap  = samples.map(f=>f.idx);
+  const content = [
+    {type:'text', text:
+`골프 스윙 프레임 ${samples.length}개(번호 0~${samples.length-1}).
+4단계 해당 번호를 순수 JSON으로 출력:
+- address: 백스윙 전 어드레스 자세
+- top: 백스윙 최고점
+- impact: 임팩트 순간
+- follow: 팔로우스루/피니시
+형식(숫자만): {"address":0,"top":4,"impact":7,"follow":10}`},
+    ...samples.flatMap((f,i)=>[
+      {type:'text',text:`[프레임 ${i}]`},
+      {type:'image',source:{type:'base64',media_type:'image/jpeg',data:f.base64}}
+    ])
+  ];
+  const raw = await callClaude(apiKey, [{role:'user',content}], 100);
+  const p = extractJSON(raw);
+  const clamp = v => Math.min(samples.length-1,Math.max(0,parseInt(v)||0));
+  return {
+    address: idxMap[clamp(p.address)],
+    top:     idxMap[clamp(p.top)],
+    impact:  idxMap[clamp(p.impact)],
+    follow:  idxMap[clamp(p.follow)],
+  };
+}
+
+async function analyzeSwing(apiKey, keyFrameIdx, frames, poseData, skeletonUrls) {
+  // 스켈레톤 오버레이 이미지 또는 원본 이미지 사용
+  const imgContent = PHASE_KEYS.flatMap((k,i) => {
+    const url = skeletonUrls[k] || frames[keyFrameIdx[k]]?.dataUrl;
+    if (!url) return [];
+    return [
+      {type:'text', text:`[${PHASE_EMOJI[i]} ${PHASES[i]}]`},
+      {type:'image', source:{type:'base64', media_type:'image/jpeg', data:url.split(',')[1]}}
+    ];
+  });
+
+  // MediaPipe 수치 요약 생성
+  const metricsText = PHASE_KEYS.map((k,i) => {
+    const m = poseData[k];
+    if (!m) return `${PHASES[i]}: MediaPipe 수치 없음`;
+    return `${PHASES[i]}: 척추전경각=${m.spineAngle}°(권장35~45°), 왼무릎=${m.leftKnee}°, 오른무릎=${m.rightKnee}°, X-Factor=${m.xFactor}°(권장35~55°), 왼팔꿈치=${m.leftElbow}°`;
+  }).join('\n');
+
+  const prompt =
+`PGA 투어 수준 골프 코치 + 인간공학(HFE) 전문가로서 분석하세요.
+
+【MediaPipe 관절 측정값】
+${metricsText}
+
+【분석 도메인】
+1. spine(척추/자세): 전경각, 역스파인, X-Factor 회전분리
+2. grip(그립/손목): 그립타입, 코킹타이밍, 임팩트릴리즈
+3. lower(하체/이동): 무릎굴곡유지, 체중이동, 힙클리어링
+4. finish(팔로우스루): 완성도, 피니시균형, 벨트버클정렬
+
+관절 수치를 반드시 피드백에 인용하세요.
+순수 JSON만 출력 (마크다운 없이):
+{"scores":{"spine":75,"grip":80,"lower":65,"finish":70},"critical":[{"title":"항목","desc":"수치 인용한 상세설명","phase":"어드레스"}],"important":[{"title":"항목","desc":"설명","phase":"탑"}],"optional":[{"title":"항목","desc":"설명","phase":"임팩트"}],"goodPoints":["잘된점1","잘된점2"],"drillTitle":"드릴이름","drillDesc":"구체적방법(횟수/세트)","summary":"수치 포함 2~3문장 종합평가"}
+규칙: critical 1~2개, important 2~3개, optional 1~2개, goodPoints 1~2개, 전부 한국어.`;
+
+  const raw = await callClaude(apiKey, [{
+    role:'user',
+    content:[{type:'text',text:prompt}, ...imgContent, {type:'text',text:'JSON으로 출력:'}]
+  }], 1800);
+  return extractJSON(raw);
+}
+
+/* ═══════════════════════════════════════════════
+   COMPONENTS
+═══════════════════════════════════════════════ */
+
+/* StepBar — 6단계 */
+function StepBar({current}) {
+  const steps=[
+    {icon:'📹',label:'업로드'},
+    {icon:'🎞️',label:'프레임'},
+    {icon:'🤖',label:'구간선택'},
+    {icon:'🦴',label:'관절분석'},  // NEW
+    {icon:'📊',label:'AI분석'},
+    {icon:'📋',label:'리포트'},
+  ];
+  return (
+    <div style={{display:'flex',alignItems:'center',marginBottom:28}}>
+      {steps.map((s,i)=>(
+        <React.Fragment key={i}>
+          <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:3,flexShrink:0}}>
+            <div style={{width:36,height:36,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:15,
+              background:current>i?'var(--green)':current===i?'rgba(34,197,94,.18)':'var(--bd)',
+              border:current>=i?'2px solid var(--green)':'2px solid var(--bd)',
+              boxShadow:current===i?'0 0 14px rgba(34,197,94,.4)':'none',transition:'all .3s'}}>
+              {current>i?'✓':s.icon}
+            </div>
+            <span style={{fontSize:9,color:current>=i?'var(--green)':'var(--dim)',whiteSpace:'nowrap'}}>{s.label}</span>
+          </div>
+          {i<steps.length-1 && <div className={`step-line${current>i?' done':''}`}/>}
+        </React.Fragment>
+      ))}
+    </div>
+  );
+}
+
+/* ScoreRing */
+function ScoreRing({score,domain}) {
+  const {color,label,icon} = DOMAIN[domain];
+  const r=36, circ=2*Math.PI*r;
+  const offset = circ-(score/100)*circ;
+  const gc = score>=80?'var(--green)':score>=60?'var(--amber)':'var(--red)';
+  return (
+    <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:4}}>
+      <div style={{position:'relative',width:86,height:86}}>
+        <svg width="86" height="86" viewBox="0 0 86 86">
+          <circle cx="43" cy="43" r={r} stroke="var(--bd)" strokeWidth="7" fill="none"/>
+          <circle cx="43" cy="43" r={r} stroke={color} strokeWidth="7" fill="none"
+            strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round"
+            style={{transform:'rotate(-90deg)',transformOrigin:'50% 50%',transition:'stroke-dashoffset 1.2s ease'}}/>
+        </svg>
+        <div style={{position:'absolute',inset:0,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center'}}>
+          <span style={{fontSize:13}}>{icon}</span>
+          <span style={{fontFamily:'JetBrains Mono',fontSize:20,fontWeight:700,color,lineHeight:1}}>{score}</span>
+        </div>
+      </div>
+      <div style={{fontSize:11,color:'var(--muted)',textAlign:'center'}}>{label}</div>
+      <div style={{fontSize:10,color:gc,fontFamily:'JetBrains Mono'}}>{score>=80?'양호':score>=60?'개선필요':'취약'}</div>
+    </div>
+  );
+}
+
+/* MetricBar — 관절 수치 시각화 */
+function MetricBar({metricKey, value}) {
+  if (value == null) return null;
+  const cfg = METRIC_RANGES[metricKey];
+  if (!cfg) return null;
+  const pct       = Math.max(0, Math.min(100, (value-cfg.min)/(cfg.max-cfg.min)*100));
+  const idealLPct = Math.max(0, (cfg.idealMin-cfg.min)/(cfg.max-cfg.min)*100);
+  const idealWPct = Math.max(0, (cfg.idealMax-cfg.idealMin)/(cfg.max-cfg.min)*100);
+  const isGood    = value >= cfg.idealMin && value <= cfg.idealMax;
+  const barColor  = isGood ? 'var(--green)' : value < cfg.idealMin ? 'var(--cyan)' : 'var(--amber)';
+  return (
+    <div style={{marginBottom:12}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:5}}>
+        <span style={{fontSize:12,color:'var(--muted)'}}>{cfg.label}</span>
+        <div style={{display:'flex',alignItems:'center',gap:6}}>
+          <span style={{fontFamily:'JetBrains Mono',fontSize:13,fontWeight:600,color:barColor}}>{value}{cfg.unit}</span>
+          <span style={{fontSize:10,color:isGood?'var(--green)':'var(--amber)'}}>{isGood?'✓ 정상':'⚠ 범위 외'}</span>
+        </div>
+      </div>
+      <div className="metric-bar-track">
+        <div className="metric-bar-ideal" style={{left:`${idealLPct}%`,width:`${idealWPct}%`}}/>
+        <div className="metric-bar-fill" style={{width:`${pct}%`,background:barColor}}/>
+        <div className="metric-bar-marker" style={{left:`${pct}%`,background:barColor}}/>
+      </div>
+      <div style={{display:'flex',justifyContent:'space-between',fontSize:9,color:'var(--dim)',marginTop:2}}>
+        <span>{cfg.min}{cfg.unit}</span>
+        <span style={{color:'rgba(34,197,94,.6)'}}>이상적: {cfg.idealMin}~{cfg.idealMax}{cfg.unit}</span>
+        <span>{cfg.max}{cfg.unit}</span>
+      </div>
+    </div>
+  );
+}
+
+/* RadarChart */
+function RadarChart({scores}) {
+  const canvasRef = useRef();
+  useEffect(()=>{
+    if (!canvasRef.current || !window.Chart) return;
+    const existing = Chart.getChart(canvasRef.current);
+    if (existing) existing.destroy();
+    new Chart(canvasRef.current, {
+      type:'radar',
+      data:{
+        labels:['척추/자세','그립/손목','하체/이동','팔로우스루'],
+        datasets:[
+          {label:'내 점수', data:[scores.spine,scores.grip,scores.lower,scores.finish],
+            borderColor:'#22c55e', backgroundColor:'rgba(34,197,94,.12)',
+            pointBackgroundColor:'#22c55e', pointBorderColor:'#fff', pointRadius:4, borderWidth:2},
+          {label:'목표', data:[80,80,80,80],
+            borderColor:'rgba(255,255,255,.15)', backgroundColor:'transparent',
+            pointRadius:0, borderWidth:1, borderDash:[4,4]},
+        ]
+      },
+      options:{
+        scales:{r:{min:0,max:100,
+          grid:{color:'rgba(30,48,72,.8)'},
+          angleLines:{color:'rgba(30,48,72,.8)'},
+          pointLabels:{color:'#6b8aaa',font:{size:11}},
+          ticks:{display:false}
+        }},
+        plugins:{legend:{display:false}},
+        animation:{duration:1200}
+      }
+    });
+  },[scores]);
+  return <canvas ref={canvasRef} width={220} height={220}/>;
+}
+
+/* ─── ProRadar ─── */
+function ProRadar({myScores, proKey}) {
+  const ref = useRef();
+  const pro = PRO_DB[proKey];
+  useEffect(() => {
+    if (!ref.current || !window.Chart || !pro) return;
+    const ex = Chart.getChart(ref.current); if (ex) ex.destroy();
+    const labels = ['척추/자세','그립/손목','하체/이동','팔로우스루'];
+    const ds = [];
+    if (myScores) {
+      ds.push({label:'내 점수',
+        data:[myScores.spine||0,myScores.grip||0,myScores.lower||0,myScores.finish||0],
+        borderColor:'#22c55e',backgroundColor:'rgba(34,197,94,.12)',
+        pointBackgroundColor:'#22c55e',pointRadius:4,borderWidth:2});
+    }
+    ds.push({label:'목표 80',data:[80,80,80,80],
+      borderColor:'rgba(255,255,255,.15)',backgroundColor:'transparent',
+      pointRadius:0,borderWidth:1,borderDash:[4,4]});
+    ds.push({label:pro.name,
+      data:[pro.scores.spine,pro.scores.grip,pro.scores.lower,pro.scores.finish],
+      borderColor:pro.color,backgroundColor:pro.color+'22',
+      pointBackgroundColor:pro.color,pointRadius:4,borderWidth:2.5});
+    new Chart(ref.current, {type:'radar',
+      data:{labels, datasets:ds},
+      options:{
+        scales:{r:{min:0,max:100,
+          grid:{color:'rgba(30,48,72,.8)'},angleLines:{color:'rgba(30,48,72,.8)'},
+          pointLabels:{color:'#6b8aaa',font:{size:10}},ticks:{display:false}}},
+        plugins:{legend:{labels:{color:'#6b8aaa',font:{size:10},boxWidth:10},
+          display:true,position:'bottom'}},
+        animation:{duration:900}}});
+  }, [myScores, proKey]);
+  return <canvas ref={ref} width={260} height={260}/>;
+}
+
+/* ─── ProMetricBar: 내 수치 없어도 항상 표시 ─── */
+function ProMetricBar({mk, myVal, proVal, proColor, proName}) {
+  const cfg = METRIC_RANGES[mk];
+  if (!cfg || (myVal == null && proVal == null)) return null;
+  const rng = cfg.max - cfg.min;
+  const toP = v => Math.max(0, Math.min(100, (v - cfg.min) / rng * 100));
+  const myPct = myVal != null ? toP(myVal) : null;
+  const prPct = proVal != null ? toP(proVal) : null;
+  const iL = toP(cfg.idealMin);
+  const iW = Math.max(0, (cfg.idealMax - cfg.idealMin) / rng * 100);
+  const isGood = myVal != null && myVal >= cfg.idealMin && myVal <= cfg.idealMax;
+  const pc = proColor || '#f59e0b';
+  const barC = myVal == null ? 'var(--bd)' : isGood ? 'var(--green)' : myVal < cfg.idealMin ? 'var(--cyan)' : 'var(--amber)';
+  return (
+    <div style={{marginBottom:11}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
+        <span style={{fontSize:11,color:'var(--muted)'}}>{cfg.label}</span>
+        <div style={{display:'flex',alignItems:'center',gap:7}}>
+          {proVal != null && (
+            <span style={{fontSize:10,padding:'1px 5px',borderRadius:3,
+              background:pc+'22',color:pc,border:'1px solid '+pc+'44',
+              fontFamily:'JetBrains Mono'}}>
+              {proName||'PRO'} {proVal}{cfg.unit}
+            </span>
+          )}
+          {myVal != null && (
+            <span style={{fontFamily:'JetBrains Mono',fontSize:12,fontWeight:600,color:barC}}>
+              {myVal}{cfg.unit}
+            </span>
+          )}
+          {myVal != null && (
+            <span style={{fontSize:9,color:isGood?'var(--green)':'var(--amber)'}}>
+              {isGood ? '✓' : '⚠'}
+            </span>
+          )}
+          {myVal == null && <span style={{fontSize:10,color:'var(--dim)'}}>— 없음</span>}
+        </div>
+      </div>
+      <div className="metric-bar-track">
+        <div className="metric-bar-ideal" style={{left:iL+'%',width:iW+'%'}}/>
+        {myPct != null && <div className="metric-bar-fill" style={{width:myPct+'%',background:barC}}/>}
+        {myPct != null && <div className="metric-bar-marker" style={{left:myPct+'%',background:barC}}/>}
+        {prPct != null && (
+          <div style={{position:'absolute',top:0,left:prPct+'%',width:3,height:'100%',
+            background:pc,transform:'translateX(-50%)',opacity:.9,borderRadius:2}}/>
+        )}
+      </div>
+      <div style={{display:'flex',justifyContent:'space-between',fontSize:8,color:'var(--dim)',marginTop:2}}>
+        <span>{cfg.min}{cfg.unit}</span>
+        <span style={{color:'rgba(34,197,94,.5)'}}>적정 {cfg.idealMin}~{cfg.idealMax}{cfg.unit}</span>
+        <span>{cfg.max}{cfg.unit}</span>
+      </div>
+    </div>
+  );
+}
+
+/* ─── HistCard ─── */
+function HistCard({s, selMode, isA, isB, onSel, onDel}) {
+  const d = new Date(s.date);
+  const dt = (d.getMonth()+1)+'/'+(d.getDate())+' '+('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2);
+  const gc = s.totalScore >= 80 ? 'var(--green)' : s.totalScore >= 60 ? 'var(--amber)' : 'var(--red)';
+  const cmap = {driver:'드라이버',iron:'아이언',wedge:'웨지',putter:'퍼터'};
+  return (
+    <div className={'hcard'+(isA?' sa':isB?' sb':'')} onClick={() => onSel(s)}>
+      <div style={{display:'flex'}}>
+        <div style={{width:84,flexShrink:0,background:'var(--s2)',position:'relative',minHeight:68}}>
+          {s.thumb
+            ? <img src={s.thumb} style={{width:'100%',height:'100%',objectFit:'cover',display:'block'}} alt=""/>
+            : <div style={{width:'100%',height:'100%',minHeight:68,display:'flex',alignItems:'center',justifyContent:'center',fontSize:22}}>⛳</div>}
+          {(isA||isB) && (
+            <div style={{position:'absolute',top:4,left:4,fontSize:10,padding:'2px 6px',
+              borderRadius:4,fontWeight:700,background:isA?'#22c55e':'#06b6d4',color:'#000'}}>
+              {isA?'A':'B'}
+            </div>
+          )}
+        </div>
+        <div style={{padding:'9px 12px',flex:1,minWidth:0}}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
+            <span style={{fontFamily:'JetBrains Mono',fontSize:22,fontWeight:900,color:gc}}>{s.totalScore}</span>
+            <div style={{display:'flex',gap:5,alignItems:'center'}}>
+              <span style={{fontSize:10,padding:'2px 7px',borderRadius:20,background:'var(--s2)',
+                color:'var(--muted)',border:'1px solid var(--bd)'}}>
+                {cmap[s.clubType]||s.clubType}
+              </span>
+              <button onClick={e=>{e.stopPropagation();onDel(s.id);}}
+                style={{background:'none',border:'none',cursor:'pointer',color:'var(--dim)',fontSize:13,padding:'0 2px'}}>
+                ✕
+              </button>
+            </div>
+          </div>
+          <div style={{fontSize:9,color:'var(--dim)',marginBottom:5,fontFamily:'JetBrains Mono'}}>{dt}</div>
+          <div style={{display:'flex',gap:3,flexWrap:'wrap'}}>
+            {Object.keys(s.scores||{}).map(k => { const v=(s.scores||{})[k];
+              const dom = DOMAIN[k];
+              return (
+                <span key={k} style={{fontSize:9,padding:'1px 5px',borderRadius:4,
+                  background:dom?dom.color+'18':'transparent',
+                  color:dom?dom.color:'var(--muted)',
+                  border:'1px solid '+(dom?dom.color+'33':'var(--bd)'),
+                  fontFamily:'JetBrains Mono'}}>
+                  {dom?dom.icon:''} {v}
+                </span>
+              );
+            })}
+          </div>
+          {selMode && (
+            <div style={{marginTop:5,fontSize:10,color:isA?'var(--green)':isB?'var(--cyan)':'var(--dim)'}}>
+              {isA?'✓ A 선택됨':isB?'✓ B 선택됨':'클릭하여 선택'}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── TrendChart ─── */
+function TrendChart({history}) {
+  const ref = useRef();
+  useEffect(() => {
+    if (!ref.current || !window.Chart || !history.length) return;
+    const ex = Chart.getChart(ref.current); if (ex) ex.destroy();
+    const sorted = [...history].reverse();
+    const labels = sorted.map(h => { const d=new Date(h.date); return (d.getMonth()+1)+'/'+(d.getDate()); });
+    const mkDs = (key, color) => ({
+      label:DOMAIN[key].label,
+      data:sorted.map(h => (h.scores&&h.scores[key])||0),
+      borderColor:color,backgroundColor:'transparent',
+      pointBackgroundColor:color,pointRadius:2,borderWidth:1.5,tension:.3,borderDash:[3,3]
+    });
+    new Chart(ref.current, {type:'line',
+      data:{labels,datasets:[
+        {label:'종합',data:sorted.map(h=>h.totalScore),borderColor:'#22c55e',
+         backgroundColor:'rgba(34,197,94,.07)',pointBackgroundColor:'#22c55e',
+         pointRadius:4,borderWidth:2.5,fill:true,tension:.3},
+        mkDs('spine','#22c55e'),mkDs('grip','#06b6d4'),mkDs('lower','#f59e0b'),mkDs('finish','#a855f7')
+      ]},
+      options:{
+        scales:{
+          x:{grid:{color:'rgba(30,48,72,.6)'},ticks:{color:'#4a6a8a',font:{size:9}}},
+          y:{min:0,max:100,grid:{color:'rgba(30,48,72,.6)'},ticks:{color:'#4a6a8a',font:{size:9}}}
+        },
+        plugins:{legend:{display:false}},animation:{duration:700}
+      }
+    });
+  }, [history]);
+  return <canvas ref={ref} style={{width:'100%',height:180}}/>;
+}
+
+/* ─── CmpRadar ─── */
+function CmpRadar({sA, sB}) {
+  const ref = useRef();
+  useEffect(() => {
+    if (!ref.current || !window.Chart) return;
+    const ex = Chart.getChart(ref.current); if (ex) ex.destroy();
+    const labels = ['척추/자세','그립/손목','하체/이동','팔로우스루'];
+    new Chart(ref.current, {type:'radar',
+      data:{labels,datasets:[
+        {label:'A',data:[sA.scores.spine,sA.scores.grip,sA.scores.lower,sA.scores.finish],
+         borderColor:'#22c55e',backgroundColor:'rgba(34,197,94,.1)',pointBackgroundColor:'#22c55e',pointRadius:4,borderWidth:2},
+        {label:'B',data:[sB.scores.spine,sB.scores.grip,sB.scores.lower,sB.scores.finish],
+         borderColor:'#06b6d4',backgroundColor:'rgba(6,182,212,.1)',pointBackgroundColor:'#06b6d4',pointRadius:4,borderWidth:2}
+      ]},
+      options:{
+        scales:{r:{min:0,max:100,
+          grid:{color:'rgba(30,48,72,.8)'},angleLines:{color:'rgba(30,48,72,.8)'},
+          pointLabels:{color:'#6b8aaa',font:{size:10}},ticks:{display:false}}},
+        plugins:{legend:{labels:{color:'#6b8aaa',font:{size:10},boxWidth:10},display:true,position:'bottom'}},
+        animation:{duration:800}
+      }
+    });
+  }, [sA, sB]);
+  return <canvas ref={ref} width={240} height={240}/>;
+}
+
+/* ════════════════════════════════════════════════════
+   ProReferencePanel — 분석 데이터 없이도 항상 동작
+════════════════════════════════════════════════════ */
+function ProReferencePanel({myScores, myPoseData}) {
+  const [selPro,   setSelPro]   = useState('tiger');
+  const [selPhase, setSelPhase] = useState('address');
+  const pro = PRO_DB[selPro];
+  if (!pro) return <div style={{color:'red',padding:20}}>PRO_DB 오류</div>;
+
+  const hasS = !!(myScores && Object.values(myScores).some(v => v > 0));
+  const hasP = !!(myPoseData && typeof myPoseData === 'object' &&
+    Object.values(myPoseData).some(v => v != null && typeof v === 'object'));
+
+  const phaseKeys   = ['address','top','impact','follow'];
+  const phaseNames  = ['어드레스','탑','임팩트','팔로우스루'];
+  const phaseEmoji  = ['🏌️','⬆️','💥','🔄'];
+  const phaseColors = ['#22c55e','#06b6d4','#f59e0b','#a855f7'];
+
+  return (
+    <div className="fade-up">
+
+      {/* 헤더 */}
+      <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',
+        marginBottom:16,flexWrap:'wrap',gap:10}}>
+        <div>
+          <div style={{fontSize:18,fontWeight:700,color:'#fff',marginBottom:4}}>
+            🏆 프로 선수 레퍼런스
+          </div>
+          <div style={{fontSize:12,color:'var(--muted)'}}>
+            {hasS ? '내 점수와 프로 기준을 비교합니다' : '분석 없이도 프로 수치 가이드로 활용하세요'}
+          </div>
+        </div>
+        {!hasS && (
+          <div style={{padding:'5px 12px',borderRadius:8,background:'rgba(245,158,11,.1)',
+            border:'1px solid rgba(245,158,11,.3)',fontSize:11,color:'var(--amber)'}}>
+            ⚠ 내 분석 없음 — 가이드 모드
+          </div>
+        )}
+      </div>
+
+      {/* 선수 선택 */}
+      <div style={{display:'flex',gap:7,marginBottom:14,flexWrap:'wrap'}}>
+        {Object.keys(PRO_DB).map(k => {
+          const p = PRO_DB[k];
+          const active = selPro === k;
+          return (
+            <button key={k} onClick={() => setSelPro(k)}
+              style={{padding:'8px 14px',borderRadius:8,fontSize:12,
+                fontWeight:active?700:400,cursor:'pointer',fontFamily:'Noto Sans KR',
+                border:'1px solid '+(active ? p.color : 'var(--bd)'),
+                background:active ? p.color+'22' : 'var(--s2)',
+                color:active ? p.color : 'var(--muted)',transition:'all .2s'}}>
+              {p.emoji} {p.name}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* 프로 프로필 카드 */}
+      <div className="card" style={{marginBottom:14,borderColor:pro.color+'55'}}>
+        <div style={{display:'flex',gap:20,flexWrap:'wrap',alignItems:'flex-start'}}>
+
+          {/* 프로 소개 */}
+          <div style={{flex:'0 0 auto',minWidth:200,maxWidth:280}}>
+            <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:10}}>
+              <div style={{width:52,height:52,borderRadius:'50%',
+                background:pro.color+'22',border:'2px solid '+pro.color+'55',
+                display:'flex',alignItems:'center',justifyContent:'center',fontSize:28}}>
+                {pro.emoji}
+              </div>
+              <div>
+                <div style={{fontSize:16,fontWeight:700,color:'#fff'}}>{pro.name}</div>
+                <span style={{fontSize:10,padding:'2px 8px',borderRadius:20,
+                  fontFamily:'JetBrains Mono',background:pro.color+'22',
+                  color:pro.color,border:'1px solid '+pro.color+'44'}}>
+                  {pro.era}
+                </span>
+              </div>
+            </div>
+            <p style={{fontSize:12,color:'var(--muted)',lineHeight:1.8,marginBottom:14,
+              padding:'8px 10px',background:'var(--s2)',borderRadius:7,
+              borderLeft:'3px solid '+pro.color}}>
+              {pro.desc}
+            </p>
+            <div style={{fontSize:11,color:'var(--muted)',fontWeight:600,marginBottom:8}}>
+              도메인별 기준 점수
+            </div>
+            <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
+              {Object.keys(DOMAIN).map(d => (
+                <ScoreRing key={d} score={pro.scores[d]} domain={d} size={64}/>
+              ))}
+            </div>
+          </div>
+
+          {/* 레이더 + 점수 비교 */}
+          <div style={{flex:1,minWidth:240,display:'flex',flexDirection:'column',
+            alignItems:'center',gap:8}}>
+            <div style={{fontSize:11,color:'var(--muted)',fontWeight:600}}>
+              {hasS ? '내 점수 vs '+pro.name : pro.name+' 점수 레이더'}
+            </div>
+            <ProRadar myScores={hasS ? myScores : null} proKey={selPro}/>
+            {hasS && (
+              <div style={{width:'100%',display:'grid',gridTemplateColumns:'1fr 1fr',gap:7,marginTop:4}}>
+                {Object.keys(DOMAIN).map(k => {
+                  const d = DOMAIN[k];
+                  const mine = (myScores && myScores[k]) || 0;
+                  const proS = pro.scores[k];
+                  const diff = mine - proS;
+                  const col = diff >= -5 ? 'var(--green)' : diff >= -15 ? 'var(--amber)' : 'var(--red)';
+                  return (
+                    <div key={k} style={{padding:'6px 8px',borderRadius:7,background:'var(--s2)',
+                      border:'1px solid '+d.color+'22'}}>
+                      <div style={{fontSize:9,color:'var(--muted)',marginBottom:2}}>
+                        {d.icon} {d.label}
+                      </div>
+                      <div style={{display:'flex',alignItems:'baseline',gap:4}}>
+                        <span style={{fontFamily:'JetBrains Mono',fontSize:13,fontWeight:700,
+                          color:'var(--green)'}}>{mine}</span>
+                        <span style={{fontSize:9,color:'var(--dim)'}}>/ {proS}</span>
+                        <span style={{fontSize:10,fontWeight:700,color:col,marginLeft:'auto'}}>
+                          {(diff >= 0 ? '+' : '')+diff}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* 관절 수치 카드 */}
+      <div className="card" style={{marginBottom:14}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',
+          marginBottom:12,flexWrap:'wrap',gap:8}}>
+          <div style={{fontSize:13,fontWeight:700,color:'#fff'}}>
+            {hasP ? '📐 관절 수치 비교' : '📐 프로 관절 수치 가이드'}
+          </div>
+          <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
+            {phaseKeys.map((k, i) => (
+              <button key={k} onClick={() => setSelPhase(k)}
+                style={{padding:'5px 11px',borderRadius:6,fontSize:11,cursor:'pointer',
+                  fontFamily:'Noto Sans KR',
+                  border:'1px solid '+(selPhase===k ? phaseColors[i] : 'var(--bd)'),
+                  background:selPhase===k ? phaseColors[i]+'18' : 'var(--s2)',
+                  color:selPhase===k ? phaseColors[i] : 'var(--muted)'}}>
+                {phaseEmoji[i]} {phaseNames[i]}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20}}>
+          {/* MetricBar 열 */}
+          <div>
+            <div style={{fontSize:11,color:'var(--muted)',fontWeight:600,marginBottom:10}}>
+              {hasP ? '내 수치 vs '+pro.name : pro.name+' 기준 수치'}
+            </div>
+            {Object.keys(METRIC_RANGES).map(mk => {
+              const phaseData = pro.metrics[selPhase];
+              const proVal = phaseData ? phaseData[mk] : null;
+              const posePhase = hasP && myPoseData[selPhase] ? myPoseData[selPhase] : null;
+              const myVal = hasP && posePhase ? (posePhase[mk] != null ? posePhase[mk] : null) : null;
+              return (
+                <ProMetricBar key={mk} mk={mk} myVal={myVal} proVal={proVal}
+                  proColor={pro.color} proName={pro.name}/>
+              );
+            })}
+            <div style={{marginTop:7,fontSize:10,color:'var(--dim)',
+              padding:'5px 8px',borderRadius:5,background:'var(--s2)'}}>
+              {'│ 선='+ pro.name +' · 녹색=이상적 범위'}
+            </div>
+          </div>
+
+          {/* 수치 비교 열 */}
+          <div>
+            <div style={{fontSize:11,color:'var(--muted)',fontWeight:600,marginBottom:10}}>
+              {hasP ? '차이 분석' : '프로 수치 상세'}
+            </div>
+            {Object.keys(METRIC_RANGES).map(mk => {
+              const cfg = METRIC_RANGES[mk];
+              const phaseData = pro.metrics[selPhase];
+              const proVal = phaseData ? phaseData[mk] : null;
+              if (proVal == null) return null;
+              const isIdeal = proVal >= cfg.idealMin && proVal <= cfg.idealMax;
+              if (hasP) {
+                const posePhase = myPoseData[selPhase];
+                const myVal = posePhase ? posePhase[mk] : null;
+                if (myVal == null) {
+                  return (
+                    <div key={mk} style={{display:'flex',alignItems:'center',
+                      justifyContent:'space-between',marginBottom:7,
+                      padding:'5px 8px',borderRadius:6,background:'var(--s2)'}}>
+                      <span style={{fontSize:11,color:'var(--muted)'}}>{cfg.label}</span>
+                      <span style={{fontSize:10,color:'var(--dim)'}}>측정없음</span>
+                    </div>
+                  );
+                }
+                const diff = myVal - proVal;
+                const ad = Math.abs(diff);
+                const sv = ad < 3 ? '✓' : ad < 8 ? '△' : '⚠';
+                const col = ad < 3 ? 'var(--green)' : ad < 8 ? 'var(--amber)' : 'var(--red)';
+                return (
+                  <div key={mk} style={{display:'flex',alignItems:'center',
+                    justifyContent:'space-between',marginBottom:7,
+                    padding:'6px 10px',borderRadius:6,background:'var(--s2)',
+                    border:'1px solid '+col+'22'}}>
+                    <span style={{fontSize:11,color:'var(--muted)'}}>{cfg.label}</span>
+                    <div style={{display:'flex',alignItems:'center',gap:6}}>
+                      <span style={{fontFamily:'JetBrains Mono',fontSize:9,color:pro.color}}>
+                        {proVal}{cfg.unit}
+                      </span>
+                      <span style={{color:'var(--dim)'}}>{'→'}</span>
+                      <span style={{fontFamily:'JetBrains Mono',fontSize:11,
+                        color:col,fontWeight:600}}>
+                        {sv} {ad < 0.5 ? '동일' : (diff > 0 ? '+' : '')+diff.toFixed(1)+cfg.unit}
+                      </span>
+                    </div>
+                  </div>
+                );
+              } else {
+                return (
+                  <div key={mk} style={{display:'flex',alignItems:'center',
+                    justifyContent:'space-between',marginBottom:7,
+                    padding:'6px 10px',borderRadius:6,background:'var(--s2)',
+                    border:'1px solid '+pro.color+'22'}}>
+                    <div>
+                      <div style={{fontSize:11,color:'var(--muted)'}}>{cfg.label}</div>
+                      <div style={{fontSize:9,color:'var(--dim)'}}>
+                        {'적정 '+cfg.idealMin+'~'+cfg.idealMax+cfg.unit}
+                      </div>
+                    </div>
+                    <div style={{display:'flex',alignItems:'center',gap:5}}>
+                      <span style={{fontFamily:'JetBrains Mono',fontSize:13,
+                        fontWeight:700,color:pro.color}}>
+                        {proVal}{cfg.unit}
+                      </span>
+                      <span style={{fontSize:10,color:isIdeal?'var(--green)':'var(--amber)'}}>
+                        {isIdeal ? '✓' : '△'}
+                      </span>
+                    </div>
+                  </div>
+                );
+              }
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* 스윙 특징 요약 카드 */}
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(170px,1fr))',gap:10}}>
+        {[
+          {icon:'🦴',label:'척추 전경각',color:'#22c55e',
+           val:(pro.metrics.address.spineAngle)+'° (어드레스)'},
+          {icon:'🔄',label:'X-Factor',color:'#06b6d4',
+           val:(pro.metrics.top.xFactor)+'° (백스윙 탑)'},
+          {icon:'🦵',label:'무릎 굴곡',color:'#f59e0b',
+           val:(pro.metrics.impact.leftKnee)+'° (임팩트)'},
+          {icon:'💪',label:'팔꿈치 신전',color:'#a855f7',
+           val:(pro.metrics.impact.leftElbow)+'° (임팩트)'},
+        ].map((item, i) => (
+          <div key={i} style={{padding:'10px 12px',borderRadius:8,background:'var(--s2)',
+            border:'1px solid '+item.color+'33'}}>
+            <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:4}}>
+              <span style={{fontSize:16}}>{item.icon}</span>
+              <span style={{fontSize:11,fontWeight:600,color:item.color}}>{item.label}</span>
+            </div>
+            <div style={{fontFamily:'JetBrains Mono',fontSize:12,color:'#e2eaf4'}}>
+              {item.val}
+            </div>
+          </div>
+        ))}
+      </div>
+
+    </div>
+  );
+}
+
+
+/* FeedbackCard */
+function FeedbackCard({item,priority}) {
+  const [open,setOpen]=useState(false);
+  const cfg={
+    critical: {cls:'fb-critical',bg:'rgba(239,68,68,.18)', c:'var(--red)',   icon:'🚨',text:'즉시 교정'},
+    important:{cls:'fb-important',bg:'rgba(245,158,11,.18)',c:'var(--amber)', icon:'⚠️',text:'중요 개선'},
+    optional: {cls:'fb-optional', bg:'rgba(59,130,246,.18)',c:'#60a5fa',     icon:'💡',text:'선택 개선'},
+  }[priority];
+  return (
+    <div className={cfg.cls} style={{borderRadius:8,padding:'10px 14px',marginBottom:8,cursor:'pointer'}} onClick={()=>setOpen(o=>!o)}>
+      <div style={{display:'flex',alignItems:'center',gap:8,justifyContent:'space-between'}}>
+        <div style={{display:'flex',alignItems:'center',gap:8,minWidth:0,flex:1}}>
+          <span>{cfg.icon}</span>
+          <span style={{fontSize:13,fontWeight:600,color:'#e2eaf4',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{item.title}</span>
+          {item.phase && <span style={{fontSize:10,padding:'1px 6px',borderRadius:4,background:'rgba(255,255,255,.07)',color:'var(--muted)',flexShrink:0}}>{item.phase}</span>}
+        </div>
+        <div style={{display:'flex',alignItems:'center',gap:6,flexShrink:0}}>
+          <span style={{fontSize:11,padding:'2px 8px',borderRadius:4,background:cfg.bg,color:cfg.c,fontFamily:'JetBrains Mono'}}>{cfg.text}</span>
+          <span style={{color:'var(--dim)',fontFamily:'JetBrains Mono'}}>{open?'▾':'▸'}</span>
+        </div>
+      </div>
+      {open && <div className="fade-up" style={{marginTop:8,paddingTop:8,borderTop:'1px solid rgba(255,255,255,.06)',fontSize:13,color:'var(--muted)',lineHeight:1.8}}>{item.desc}</div>}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════
+   MAIN APP
+═══════════════════════════════════════════════ */
+function App() {
+  const [step,        setStep]        = useState(0);
+  const [apiKey,      setApiKey]      = useState(()=>localStorage.getItem('swingai_k')||'');
+  const [showKey,     setShowKey]     = useState(false);
+  const [videoFile,   setVideoFile]   = useState(null);
+  const [videoUrl,    setVideoUrl]    = useState('');
+  const [clubType,    setClubType]    = useState('driver');
+  const [cameraAngle, setCameraAngle] = useState('side');
+  const [frames,      setFrames]      = useState([]);
+  const [keyFrameIdx, setKeyFrameIdx] = useState({address:0,top:6,impact:13,follow:18});
+  const [progPct,     setProgPct]     = useState(0);
+  const [progMsg,     setProgMsg]     = useState('');
+  const [loadMsg,     setLoadMsg]     = useState('');
+  // Phase 2 new states
+  const [poseData,    setPoseData]    = useState({});       // {address: metrics, ...}
+  const [skeletonUrls,setSkeletonUrls]= useState({});      // {address: dataUrl, ...}
+  const [mpStatus,    setMpStatus]    = useState('idle');   // idle|loading|ready|failed
+  const [poseProgress,setPoseProgress]= useState(0);
+  const [selPhase,    setSelPhase]    = useState('address');
+  const [classified,  setClassified]  = useState(false);
+  const [result,      setResult]      = useState(null);
+  const [error,       setError]       = useState('');
+  const [dragOver,    setDragOver]    = useState(false);
+
+  const [tab,     setTab]     = useState('analysis');
+  const [history, setHistory] = useState(() => hLoad());
+  const [cmpSel,  setCmpSel]  = useState({a:null, b:null});
+
+  const videoRef = useRef(null);
+  const fileRef  = useRef(null);
+
+  const saveKey = k => { setApiKey(k); localStorage.setItem('swingai_k',k); };
+
+  const handleFile = file => {
+    if (!file?.type.startsWith('video/')) { setError('동영상 파일만 가능합니다'); return; }
+    if (file.size>250*1024*1024) { setError('250MB 이하만 가능합니다'); return; }
+    setError(''); setVideoFile(file); setVideoUrl(URL.createObjectURL(file));
+  };
+
+  /* STEP 0 → 1: 프레임 추출 */
+  const doExtract = async () => {
+    const vid = videoRef.current;
+    if (!vid) { setError('영상 로드 오류'); return; }
+    setError(''); setStep(1); setProgPct(0);
+    try {
+      let p=0;
+      const t = setInterval(()=>{ p=Math.min(p+4,88); setProgPct(p); },150);
+      const extracted = await extractFrames(vid, 20);
+      clearInterval(t); setProgPct(100);
+      if (!extracted.length) throw new Error('추출된 프레임이 없습니다');
+      setFrames(extracted);
+      const n=extracted.length;
+      setKeyFrameIdx({address:0,top:Math.floor(n*.3),impact:Math.floor(n*.6),follow:Math.floor(n*.85)});
+      setClassified(false);
+      setTimeout(()=>setStep(2), 400);
+    } catch(e) { setError('프레임 추출 실패: '+e.message); setStep(0); }
+  };
+
+  /* STEP 2: AI 분류 */
+  const doClassify = async () => {
+    if (!apiKey) { setError('API 키를 입력해주세요'); return; }
+    setError(''); setLoadMsg('Claude Vision이 스윙 구간 분류 중…');
+    try {
+      const kf = await classifyKeyFrames(apiKey, frames);
+      setKeyFrameIdx(kf); setClassified(true); setLoadMsg('');
+    } catch(e) { setError('AI 분류 실패: '+e.message); setLoadMsg(''); }
+  };
+
+  /* STEP 2 → 3: MediaPipe 관절 분석 */
+  const doPoseAnalysis = async () => {
+    setStep(3); setError('');
+    setPoseProgress(0);
+
+    // MediaPipe 초기화
+    setProgMsg('MediaPipe Pose 모델 로드 중…');
+    setMpStatus('loading');
+    const ok = await initMediaPipe();
+    if (!ok) { setMpStatus('failed'); }
+    else { setMpStatus('ready'); }
+
+    const newPoseData     = {};
+    const newSkeletonUrls = {};
+
+    for (let i=0; i<PHASE_KEYS.length; i++) {
+      const k = PHASE_KEYS[i];
+      const f = frames[keyFrameIdx[k]];
+      if (!f) continue;
+      setProgMsg(`${PHASES[i]} 관절 분석 중… (${i+1}/4)`);
+      setPoseProgress(Math.round((i/4)*100));
+
+      let lm = null;
+      if (ok && poseInstance) {
+        lm = await getPoseLandmarks(f.dataUrl);
+      }
+      const metrics = extractMetrics(lm);
+      newPoseData[k] = metrics;
+
+      // 스켈레톤 오버레이
+      const overlayUrl = await drawSkeletonOverlay(f.dataUrl, lm, metrics, PHASE_COLOR[i]);
+      newSkeletonUrls[k] = overlayUrl;
+
+      setPoseProgress(Math.round(((i+1)/4)*100));
+    }
+
+    setPoseData(newPoseData);
+    setSkeletonUrls(newSkeletonUrls);
+    setProgMsg('');
+    setPoseProgress(100);
+
+    // 관절분석 완료 → 즉시 Claude 분석 (로컬 변수 직접 전달로 state 비동기 문제 회피)
+    setTimeout(async () => {
+      if (!apiKey) { setError('API 키를 입력해주세요'); return; }
+      setStep(4); setLoadMsg('Claude Vision + 관절수치 종합 분석 중…');
+      try {
+        const res = await analyzeSwing(apiKey, keyFrameIdx, frames, newPoseData, newSkeletonUrls);
+        setResult(res); setStep(5); setLoadMsg('');
+        // 히스토리 자동 저장
+        const _tot = Math.round(Object.values(res.scores).reduce((a,b)=>a+b,0)/4);
+        makeThumbnail(newSkeletonUrls['impact'] || (frames[keyFrameIdx['impact']] ? frames[keyFrameIdx['impact']].dataUrl : null) || null).then(_thumb => {
+          setHistory(hSave({id:Date.now(),date:new Date().toISOString(),
+            clubType,totalScore:_tot,scores:res.scores,
+            poseData:newPoseData,thumb:_thumb,
+            summary:res.summary||'',critical:res.critical||[]}));
+        });
+      } catch(e) { setError('분석 실패: '+e.message); setStep(3); setLoadMsg(''); }
+    }, 500);
+  };
+
+  const reset = () => {
+    setStep(0); setVideoFile(null); setVideoUrl(''); setFrames([]);
+    setResult(null); setError(''); setProgPct(0); setClassified(false);
+    setPoseData({}); setSkeletonUrls({}); setMpStatus('idle'); setPoseProgress(0);
+    setKeyFrameIdx({address:0,top:6,impact:13,follow:18});
+  };
+
+  const totalScore = result ? Math.round(Object.values(result.scores).reduce((a,b)=>a+b,0)/4) : 0;
+
+  /* ═══════ RENDER ═══════ */
+  return (
+    <div style={{minHeight:'100vh',background:'linear-gradient(160deg,#080e18 0%,#0d1a2a 55%,#080e18 100%)'}}>
+
+      {/* Header */}
+      <header className="glass" style={{position:'sticky',top:0,zIndex:40,borderBottom:'1px solid var(--bd)',padding:'10px 20px'}}>
+        <div style={{maxWidth:1020,margin:'0 auto',display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap'}}>
+          <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+            <span style={{fontFamily:'Bebas Neue',fontSize:26,letterSpacing:3,color:'var(--green)'}}>⛳ SWING AI</span>
+            <span style={{fontSize:9,color:'var(--dim)',fontFamily:'JetBrains Mono',background:'var(--bd)',padding:'2px 8px',borderRadius:4}}>Phase 3</span>
+          </div>
+          <nav className="no-print" style={{display:'flex',gap:4,flexWrap:'wrap',margin:'0 auto'}}>
+            <button className={'ntab'+(tab==='analysis'?' on':'')} onClick={()=>setTab('analysis')}>📹 분석</button>
+            <button className={'ntab'+(tab==='history'?' on':'')} onClick={()=>setTab('history')}>
+              {'📅 히스토리'+(history.length?' ('+history.length+')':'')}
+            </button>
+            <button className={'ntab'+(tab==='compare'?' on':'')} onClick={()=>setTab('compare')}>⚖️ 비교</button>
+            <button className={'ntab'+(tab==='proref'?' on':'')} onClick={()=>setTab('proref')}>🏆 프로 레퍼런스</button>
+          </nav>
+          <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+            <span style={{fontSize:11,color:'var(--dim)'}}>API Key</span>
+            <div style={{position:'relative',display:'flex',alignItems:'center'}}>
+              <input type={showKey?'text':'password'} placeholder="sk-ant-..." value={apiKey}
+                onChange={e=>saveKey(e.target.value)}
+                style={{background:'var(--s1)',border:'1px solid '+(apiKey?'var(--green)':'var(--bd)'),borderRadius:6,padding:'5px 34px 5px 10px',fontSize:12,color:'#e2eaf4',width:200,outline:'none',fontFamily:'JetBrains Mono'}}/>
+              <button onClick={()=>setShowKey(s=>!s)} style={{position:'absolute',right:8,background:'none',border:'none',cursor:'pointer',fontSize:14,color:'var(--dim)'}}>
+                {showKey?'🙈':'👁️'}
+              </button>
+            </div>
+            {apiKey && <span>✅</span>}
+            {step>0 && <button className="no-print" onClick={reset} style={{fontSize:12,color:'var(--muted)',background:'var(--bd)',border:'none',borderRadius:6,padding:'5px 12px',cursor:'pointer'}}>↺ 초기화</button>}
+          </div>
+        </div>
+      </header>
+
+      <div style={{maxWidth:1020,margin:'0 auto',padding:'28px 20px'}}>
+        {error && <div className="fade-up" style={{marginBottom:14,padding:'10px 16px',borderRadius:8,background:'rgba(239,68,68,.1)',border:'1px solid rgba(239,68,68,.3)',color:'#f87171',fontSize:13}}>⚠️ {error}</div>}
+
+        {/* ═══ ANALYSIS TAB ═══ */}
+        {tab==='analysis' && (
+        <div>
+          <StepBar current={step}/>
+
+        {/* ==================== STEP 0: UPLOAD ==================== */}
+        {step===0 && (
+          <div className="fade-up">
+            <div style={{textAlign:'center',marginBottom:24}}>
+              <h1 style={{fontFamily:'Bebas Neue',fontSize:44,letterSpacing:2,color:'#fff',lineHeight:1}}>골프 스윙 AI 분석</h1>
+              <p style={{fontSize:14,color:'var(--muted)',marginTop:6}}>MediaPipe 관절 수치 + Claude Vision 종합 분석 · Phase 2</p>
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:isMob()?'1fr':'1fr 330px',gap:18}}>
+              <div className={`drop-zone${dragOver?' drop-over':''}`}
+                style={{minHeight:260,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:20}}
+                onClick={()=>fileRef.current.click()}
+                onDragOver={e=>{e.preventDefault();setDragOver(true)}}
+                onDragLeave={()=>setDragOver(false)}
+                onDrop={e=>{e.preventDefault();setDragOver(false);handleFile(e.dataTransfer.files[0])}}>
+                {videoFile ? (
+                  <div style={{width:'100%'}} onClick={e=>e.stopPropagation()}>
+                    <video src={videoUrl} controls style={{width:'100%',maxHeight:200,borderRadius:10,background:'#000',display:'block'}}/>
+                    <div style={{marginTop:8,fontSize:13,color:'var(--green)',textAlign:'center'}}>✅ {videoFile.name} · {(videoFile.size/1024/1024).toFixed(1)}MB</div>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{fontSize:50,marginBottom:12}}>🎬</div>
+                    <div style={{fontSize:15,fontWeight:600,color:'#e2eaf4',marginBottom:5}}>드래그하거나 클릭하여 업로드</div>
+                    <div style={{fontSize:13,color:'var(--dim)'}}>MP4, MOV, WebM · 최대 250MB</div>
+                    <div style={{marginTop:12,padding:'5px 14px',borderRadius:6,background:'rgba(34,197,94,.1)',color:'var(--green)',fontSize:12,border:'1px solid rgba(34,197,94,.2)'}}>📐 측면 촬영 시 관절 추출 정확도 최고</div>
+                  </>
+                )}
+              </div>
+              <input ref={fileRef} type="file" accept="video/*" style={{display:'none'}} onChange={e=>handleFile(e.target.files[0])}/>
+              <div style={{display:'flex',flexDirection:'column',gap:14}}>
+                <div className="card">
+                  <div style={{fontSize:13,fontWeight:700,color:'#fff',marginBottom:12}}>⚙️ 분석 설정</div>
+                  <div style={{marginBottom:12}}>
+                    <label style={{fontSize:11,color:'var(--muted)',display:'block',marginBottom:5}}>클럽 종류</label>
+                    <select value={clubType} onChange={e=>setClubType(e.target.value)}
+                      style={{width:'100%',background:'var(--s2)',border:'1px solid var(--bd)',borderRadius:6,padding:'7px 10px',color:'#e2eaf4',fontSize:13}}>
+                      <option value="driver">🏌️ 드라이버</option>
+                      <option value="iron">⛳ 아이언</option>
+                      <option value="wedge">🔧 웨지</option>
+                      <option value="putter">🎯 퍼터</option>
+                    </select>
+                  </div>
+                  <label style={{fontSize:11,color:'var(--muted)',display:'block',marginBottom:6}}>촬영 각도</label>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
+                    {[['side','🎥 측면(권장)'],['front','📹 정면'],['behind','📸 후방'],['angle','↗ 사선']].map(([v,l])=>(
+                      <button key={v} onClick={()=>setCameraAngle(v)}
+                        style={{padding:'6px',borderRadius:6,fontSize:11,cursor:'pointer',
+                          background:cameraAngle===v?'rgba(34,197,94,.12)':'var(--s2)',
+                          border:`1px solid ${cameraAngle===v?'var(--green)':'var(--bd)'}`,
+                          color:cameraAngle===v?'var(--green)':'var(--muted)'}}>
+                        {l}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {/* Phase 2 info */}
+                <div className="card" style={{background:'rgba(6,182,212,.04)',borderColor:'rgba(6,182,212,.2)'}}>
+                  <div style={{fontSize:12,fontWeight:600,color:'var(--cyan)',marginBottom:8}}>🦴 Phase 2 신규 기능</div>
+                  {['MediaPipe 관절 33개 추출','척추각/무릎각/X-Factor 수치화','스켈레톤 오버레이 시각화','관절 수치 기반 AI 피드백','레이더 차트 점수 시각화'].map((t,i)=>(
+                    <div key={i} style={{fontSize:11,color:'var(--muted)',marginBottom:4}}><span style={{color:'var(--cyan)'}}>✦</span> {t}</div>
+                  ))}
+                </div>
+                <button onClick={doExtract} disabled={!videoFile||!apiKey}
+                  style={{padding:'13px',borderRadius:10,fontSize:14,fontWeight:700,
+                    background:(videoFile&&apiKey)?'linear-gradient(135deg,#22c55e,#16a34a)':'var(--bd)',
+                    color:(videoFile&&apiKey)?'#fff':'var(--dim)',border:'none',
+                    cursor:(videoFile&&apiKey)?'pointer':'not-allowed',transition:'all .2s'}}>
+                  {!apiKey?'🔑 API 키를 먼저 입력하세요':!videoFile?'📹 영상을 업로드하세요':'🚀 분석 시작 →'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ==================== STEP 1: EXTRACTING ==================== */}
+        {step===1 && (
+          <div className="fade-up" style={{textAlign:'center',padding:'50px 0'}}>
+            <div style={{fontSize:54,marginBottom:14}}>🎞️</div>
+            <h2 style={{fontSize:22,fontWeight:700,color:'#fff',marginBottom:6}}>프레임 추출 중</h2>
+            <p style={{color:'var(--muted)',marginBottom:24,fontSize:14}}>동영상에서 20개 프레임을 추출합니다…</p>
+            <div style={{maxWidth:360,margin:'0 auto'}}>
+              <div style={{display:'flex',justifyContent:'space-between',marginBottom:5,fontSize:12}}>
+                <span style={{color:'var(--muted)'}}>진행률</span>
+                <span style={{color:'var(--green)',fontFamily:'JetBrains Mono'}}>{progPct}%</span>
+              </div>
+              <div className="prog-track"><div className="prog-fill" style={{width:`${progPct}%`}}/></div>
+            </div>
+          </div>
+        )}
+
+        {/* ==================== STEP 2: FRAME SELECTION ==================== */}
+        {step===2 && (
+          <div className="fade-up">
+            <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:16,flexWrap:'wrap',gap:10}}>
+              <div>
+                <h2 style={{fontSize:19,fontWeight:700,color:'#fff'}}>🎞️ 스윙 구간 선택</h2>
+                <p style={{fontSize:12,color:'var(--muted)',marginTop:3}}>AI 자동 분류 후 슬라이더로 수동 조정하세요</p>
+              </div>
+              <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                {loadMsg && <span style={{fontSize:12,color:'var(--green)'}} className="pulse-dot">● {loadMsg}</span>}
+                <button onClick={doClassify} disabled={!!loadMsg}
+                  style={{padding:'7px 16px',borderRadius:8,fontSize:12,fontWeight:600,cursor:loadMsg?'not-allowed':'pointer',
+                    background:'rgba(34,197,94,.12)',border:'1px solid var(--green)',color:'var(--green)'}}>
+                  {loadMsg?'분류 중…':classified?'🤖 재분류':'🤖 AI 자동 분류'}
+                </button>
+              </div>
+            </div>
+
+            <div className="card" style={{marginBottom:12}}>
+              <div style={{display:'flex',gap:8,marginBottom:12,flexWrap:'wrap'}}>
+                {PHASE_KEYS.map((k,i)=>(
+                  <button key={k} className="phase-tab"
+                    onClick={()=>setSelPhase(k)}
+                    style={selPhase===k?{borderColor:PHASE_COLOR[i],color:PHASE_COLOR[i],background:`${PHASE_COLOR[i]}18`}:{}}>
+                    {PHASE_EMOJI[i]} {PHASES[i]}{classified&&<span style={{marginLeft:4,fontSize:9,opacity:.6}}>AI✓</span>}
+                  </button>
+                ))}
+              </div>
+              {(()=>{
+                const pi=PHASE_KEYS.indexOf(selPhase), fi=keyFrameIdx[selPhase], f=frames[fi];
+                const desc={address:'백스윙 전 초기 준비 자세',top:'백스윙 최고점',impact:'다운스윙 후 임팩트 순간',follow:'임팩트 이후 피니시'}[selPhase];
+                return (
+                  <div style={{display:'grid',gridTemplateColumns:isMob()?'1fr':'auto 1fr',gap:isMob()?12:18,alignItems:'start'}}>
+                    <div style={{width:200}}>
+                      {f?.dataUrl ? (
+                        <div style={{borderRadius:10,overflow:'hidden',border:`2px solid ${PHASE_COLOR[pi]}`}}>
+                          <img src={f.dataUrl} style={{width:'100%',display:'block'}} alt={PHASES[pi]}/>
+                          <div style={{padding:'4px 8px',background:'var(--s2)',fontSize:11,textAlign:'center',color:PHASE_COLOR[pi],fontWeight:600}}>
+                            {PHASE_EMOJI[pi]} {PHASES[pi]} · <span style={{fontFamily:'JetBrains Mono',color:'var(--muted)'}}>{f.time.toFixed(2)}s</span>
+                          </div>
+                        </div>
+                      ) : <div style={{width:200,height:140,background:'var(--s2)',borderRadius:10,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--dim)',fontSize:12}}>없음</div>}
+                    </div>
+                    <div>
+                      <div style={{fontSize:13,fontWeight:600,color:'#fff',marginBottom:5}}>{PHASE_EMOJI[pi]} {PHASES[pi]}</div>
+                      <div style={{fontSize:12,color:'var(--muted)',marginBottom:12,lineHeight:1.7}}>{desc}</div>
+                      <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:5}}>
+                        <input type="range" min={0} max={frames.length-1} value={fi}
+                          onChange={e=>setKeyFrameIdx(p=>({...p,[selPhase]:parseInt(e.target.value)}))}
+                          style={{flex:1,accentColor:PHASE_COLOR[pi]}}/>
+                        <span style={{fontFamily:'JetBrains Mono',fontSize:11,color:'var(--muted)',minWidth:60}}>{fi+1}/{frames.length}</span>
+                      </div>
+                      <div style={{fontSize:11,color:'var(--dim)'}}>← → 슬라이더 조정 · 격자에서 직접 클릭도 가능</div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Frames grid */}
+            <div className="card" style={{marginBottom:12}}>
+              <div style={{fontSize:11,color:'var(--muted)',marginBottom:8}}>전체 {frames.length}개 프레임 — 클릭 시 현재 탭에 적용</div>
+              <div style={{display:'grid',gridTemplateColumns:isMob()?'repeat(5,1fr)':'repeat(10,1fr)',gap:4}}>
+                {frames.map((f,i)=>{
+                  const isSel=keyFrameIdx[selPhase]===i;
+                  const anyIdx=PHASE_KEYS.findIndex(k=>keyFrameIdx[k]===i);
+                  return (
+                    <div key={i} className={`frame-thumb${isSel?' sel':''}`} onClick={()=>setKeyFrameIdx(p=>({...p,[selPhase]:i}))}>
+                      <img src={f.dataUrl} style={{width:'100%',height:'100%',objectFit:'cover',display:'block'}} alt={`f${i}`}/>
+                      <div style={{position:'absolute',top:1,left:1,fontSize:8,background:'rgba(0,0,0,.75)',color:'#fff',padding:'1px 3px',borderRadius:2,fontFamily:'JetBrains Mono'}}>{i}</div>
+                      {anyIdx>=0 && <div style={{position:'absolute',bottom:0,left:0,right:0,fontSize:8,textAlign:'center',background:PHASE_COLOR[anyIdx]+'cc',color:'#000',fontWeight:700,padding:'1px 0'}}>{PHASES[anyIdx].slice(0,2)}</div>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* 4 selected summary */}
+            <div className="card" style={{marginBottom:16}}>
+              <div style={{fontSize:11,color:'var(--muted)',marginBottom:10}}>선택된 4개 핵심 프레임</div>
+              <div style={{display:'grid',gridTemplateColumns:isMob()?'repeat(2,1fr)':'repeat(4,1fr)',gap:8}}>
+                {PHASE_KEYS.map((k,pi)=>{const f=frames[keyFrameIdx[k]];return (
+                  <div key={k} style={{borderRadius:8,overflow:'hidden',border:`1px solid ${PHASE_COLOR[pi]}55`,cursor:'pointer'}} onClick={()=>setSelPhase(k)}>
+                    {f?.dataUrl ? <img src={f.dataUrl} style={{width:'100%',display:'block'}} alt={PHASES[pi]}/> : <div style={{height:70,background:'var(--s2)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,color:'var(--dim)'}}>없음</div>}
+                    <div style={{padding:'3px 6px',background:'var(--s2)',fontSize:10,textAlign:'center',color:PHASE_COLOR[pi],fontWeight:600}}>{PHASE_EMOJI[pi]} {PHASES[pi]}</div>
+                  </div>
+                );})}
+              </div>
+            </div>
+
+            <div style={{display:'flex',justifyContent:'flex-end',gap:10}}>
+              <button onClick={()=>setStep(0)} style={{padding:'9px 16px',borderRadius:8,background:'var(--bd)',border:'none',color:'var(--muted)',fontSize:13,cursor:'pointer'}}>← 이전</button>
+              <button onClick={doPoseAnalysis}
+                style={{padding:'9px 24px',borderRadius:8,background:'linear-gradient(135deg,#06b6d4,#0891b2)',border:'none',color:'#fff',fontSize:13,fontWeight:700,cursor:'pointer'}}>
+                🦴 관절 분석 시작 →
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ==================== STEP 3: POSE ANALYSIS ==================== */}
+        {step===3 && (
+          <div className="fade-up">
+            <div style={{textAlign:'center',marginBottom:28}}>
+              <div style={{fontSize:52,marginBottom:14}}>🦴</div>
+              <h2 style={{fontSize:22,fontWeight:700,color:'#fff',marginBottom:6}}>관절 수치 분석 중</h2>
+              <p style={{color:'var(--muted)',marginBottom:20,fontSize:14}}>MediaPipe Pose가 33개 관절 좌표를 추출하고 있습니다</p>
+              <div style={{display:'inline-flex',alignItems:'center',gap:8,padding:'8px 20px',borderRadius:24,
+                background:'rgba(6,182,212,.08)',border:'1px solid rgba(6,182,212,.2)',fontSize:13,color:'var(--cyan)'}}>
+                <span className="pulse-dot">●</span> {progMsg || '준비 중…'}
+              </div>
+              {mpStatus==='failed' && (
+                <div style={{marginTop:12,padding:'8px 16px',borderRadius:8,background:'rgba(245,158,11,.1)',border:'1px solid rgba(245,158,11,.3)',fontSize:12,color:'var(--amber)',maxWidth:480,margin:'12px auto 0'}}>
+                  ⚠️ MediaPipe 로드 실패 — AI 분석은 정상 진행됩니다<br/>
+                  <span style={{fontSize:11,color:'var(--dim)'}}>파일을 직접 열 때 WASM 제한이 있습니다. 로컬 서버(python -m http.server) 사용 권장</span>
+                </div>
+              )}
+            </div>
+
+            <div style={{maxWidth:400,margin:'0 auto 32px'}}>
+              <div style={{display:'flex',justifyContent:'space-between',marginBottom:5,fontSize:12}}>
+                <span style={{color:'var(--muted)'}}>관절 추출 진행률</span>
+                <span style={{color:'var(--cyan)',fontFamily:'JetBrains Mono'}}>{poseProgress}%</span>
+              </div>
+              <div className="prog-track">
+                <div style={{height:'100%',background:'linear-gradient(90deg,var(--cyan),#0891b2)',borderRadius:'9999px',width:`${poseProgress}%`,transition:'width .3s ease'}}/>
+              </div>
+            </div>
+
+            {/* 처리 중인 프레임 미리보기 */}
+            <div style={{display:'grid',gridTemplateColumns:isMob()?'repeat(2,1fr)':'repeat(4,1fr)',gap:12,maxWidth:680,margin:'0 auto'}}>
+              {PHASE_KEYS.map((k,pi)=>{
+                const f=frames[keyFrameIdx[k]];
+                const done=!!skeletonUrls[k]; // 처리 완료된 프레임
+                return f ? (
+                  <div key={k} className={done?'':'scan-wrap'} style={{borderRadius:10,overflow:'hidden',border:`1px solid ${PHASE_COLOR[pi]}44`,position:'relative'}}>
+                    <img src={done?(skeletonUrls[k]||f.dataUrl):f.dataUrl}
+                      style={{width:'100%',display:'block',filter:done?'none':'brightness(.7)'}} alt={PHASES[pi]}/>
+                    {!done && <div className="scan-line"/>}
+                    <div style={{padding:'5px',fontSize:10,textAlign:'center',color:PHASE_COLOR[pi],fontWeight:600,background:'var(--s2)'}}>
+                      {PHASE_EMOJI[pi]} {PHASES[pi]}
+                      {done && <span style={{marginLeft:4,fontSize:9,color:'var(--green)'}}>✓ 완료</span>}
+                    </div>
+                  </div>
+                ) : null;
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ==================== STEP 4: AI ANALYZING ==================== */}
+        {step===4 && (
+          <div className="fade-up" style={{textAlign:'center',padding:'50px 0 30px'}}>
+            <div style={{fontSize:52,marginBottom:14}}>🤖</div>
+            <h2 style={{fontSize:22,fontWeight:700,color:'#fff',marginBottom:6}}>AI 스윙 분석 중</h2>
+            <p style={{color:'var(--muted)',marginBottom:20,fontSize:14}}>관절 수치 + 4개 이미지 종합 분석 중…</p>
+            <div style={{display:'inline-flex',alignItems:'center',gap:8,padding:'8px 20px',borderRadius:24,
+              background:'rgba(34,197,94,.08)',border:'1px solid rgba(34,197,94,.2)',fontSize:13,color:'var(--green)'}}>
+              <span className="pulse-dot">●</span> {loadMsg}
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:isMob()?'repeat(2,1fr)':'repeat(4,1fr)',gap:12,marginTop:24,maxWidth:680,marginLeft:'auto',marginRight:'auto'}}>
+              {PHASE_KEYS.map((k,pi)=>{
+                const url=skeletonUrls[k]||frames[keyFrameIdx[k]]?.dataUrl;
+                return url?(
+                  <div key={k} className="scan-wrap" style={{borderRadius:10,overflow:'hidden',border:`1px solid ${PHASE_COLOR[pi]}44`}}>
+                    <img src={url} style={{width:'100%',display:'block',filter:'brightness(.85)'}} alt={PHASES[pi]}/>
+                    <div className="scan-line"/>
+                    <div style={{padding:'5px',fontSize:10,textAlign:'center',color:PHASE_COLOR[pi],fontWeight:600,background:'var(--s2)'}}>
+                      {PHASE_EMOJI[pi]} {PHASES[pi]}
+                    </div>
+                  </div>
+                ):null;
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ==================== STEP 5: REPORT ==================== */}
+        {step===5 && result && (
+          <div className="fade-up">
+            {/* Report header */}
+            <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:20,flexWrap:'wrap',gap:10}}>
+              <div>
+                <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:6,flexWrap:'wrap'}}>
+                  <span style={{fontFamily:'Bebas Neue',fontSize:36,letterSpacing:2,color:'#fff'}}>분석 리포트</span>
+                  <span style={{fontSize:10,background:'var(--bd)',color:'var(--muted)',padding:'2px 10px',borderRadius:20,fontFamily:'JetBrains Mono'}}>
+                    {new Date().toLocaleDateString('ko-KR')} · {clubType}
+                  </span>
+                  {mpStatus==='ready' && <span className="tag-mp">관절 수치 포함</span>}
+                </div>
+                <p style={{fontSize:13,color:'var(--muted)',maxWidth:560,lineHeight:1.8}}>{result.summary}</p>
+              </div>
+              <div className="no-print" style={{display:'flex',gap:8}}>
+                <button onClick={reset} style={{padding:'7px 14px',borderRadius:8,background:'var(--bd)',border:'none',color:'var(--muted)',fontSize:12,cursor:'pointer'}}>↺ 새 분석</button>
+                <button onClick={()=>window.print()} style={{padding:'7px 14px',borderRadius:8,background:'rgba(34,197,94,.1)',border:'1px solid rgba(34,197,94,.3)',color:'var(--green)',fontSize:12,cursor:'pointer'}}>🖨 인쇄</button>
+              </div>
+            </div>
+
+            {/* ── Scores + Radar ── */}
+            <div className="card" style={{marginBottom:16}}>
+              <div style={{display:'flex',alignItems:'center',gap:24,flexWrap:'wrap'}}>
+                {/* Total */}
+                <div style={{textAlign:'center',flexShrink:0}}>
+                  <div style={{fontSize:10,color:'var(--muted)',marginBottom:8,letterSpacing:1,textTransform:'uppercase'}}>종합 점수</div>
+                  <div style={{width:92,height:92,borderRadius:'50%',
+                    background:`conic-gradient(var(--green) ${totalScore*3.6}deg,var(--bd) 0deg)`,
+                    display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 0 18px rgba(34,197,94,.25)'}}>
+                    <div style={{width:72,height:72,borderRadius:'50%',background:'var(--s1)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center'}}>
+                      <span style={{fontSize:24,fontWeight:900,color:'var(--green)',lineHeight:1,fontFamily:'JetBrains Mono'}}>{totalScore}</span>
+                      <span style={{fontSize:10,color:'var(--dim)'}}>/100</span>
+                    </div>
+                  </div>
+                  <div style={{marginTop:6,fontSize:11,color:totalScore>=80?'var(--green)':totalScore>=60?'var(--amber)':'var(--red)',fontWeight:600}}>
+                    {totalScore>=80?'🏆 우수':totalScore>=60?'⚡ 개선중':'🔧 집중교정'}
+                  </div>
+                </div>
+                {/* Domain rings */}
+                <div style={{display:'flex',gap:16,flexWrap:'wrap',flex:1,justifyContent:'center'}}>
+                  {Object.keys(DOMAIN).map(d=><ScoreRing key={d} score={result.scores?.[d]||0} domain={d}/>)}
+                </div>
+                {/* Radar chart */}
+                <div style={{flexShrink:0}}>
+                  <RadarChart scores={result.scores}/>
+                </div>
+              </div>
+            </div>
+
+            {/* ── 스켈레톤 오버레이 프레임 ── */}
+            <div className="card" style={{marginBottom:16}}>
+              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12}}>
+                <div style={{fontSize:13,fontWeight:700,color:'#fff'}}>🦴 관절 분석 프레임</div>
+                {mpStatus==='ready'
+                  ? <span className="tag-mp">MediaPipe 스켈레톤 오버레이</span>
+                  : <span style={{fontSize:10,padding:'2px 7px',borderRadius:4,background:'rgba(245,158,11,.15)',color:'var(--amber)',fontFamily:'JetBrains Mono',border:'1px solid rgba(245,158,11,.3)'}}>AI Vision 분석</span>}
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10}}>
+                {PHASE_KEYS.map((k,pi)=>{
+                  const url=skeletonUrls[k]||frames[keyFrameIdx[k]]?.dataUrl;
+                  const m=poseData[k];
+                  return (
+                    <div key={k} style={{borderRadius:10,overflow:'hidden',border:`1px solid ${PHASE_COLOR[pi]}55`,background:'var(--s2)'}}>
+                      {url ? <img src={url} alt={PHASES[pi]} style={{width:'100%',display:'block',aspectRatio:'4/3',objectFit:'cover'}}/> : <div style={{height:90,display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,color:'var(--dim)'}}>없음</div>}
+                      <div style={{padding:'5px 8px'}}>
+                        <div style={{fontSize:11,textAlign:'center',color:PHASE_COLOR[pi],fontWeight:600,marginBottom:4}}>
+                          {PHASE_EMOJI[pi]} {PHASES[pi]}
+                        </div>
+                        {m && (
+                          <div style={{fontSize:9,color:'var(--dim)',fontFamily:'JetBrains Mono',lineHeight:1.7,textAlign:'center'}}>
+                            척추 {m.spineAngle}° · 무릎L {m.leftKnee}°<br/>X-Factor {m.xFactor}°
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* ── 관절 수치 상세 (어드레스 기준) ── */}
+            {Object.values(poseData).some(v=>v!==null) && (
+              <div className="card" style={{marginBottom:16}}>
+                <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:14}}>
+                  <div style={{fontSize:13,fontWeight:700,color:'#fff'}}>📐 관절 수치 상세 분석</div>
+                  <div style={{display:'flex',gap:6}}>
+                    {['address','top','impact','follow'].map((k,i)=>(
+                      poseData[k] && <span key={k} style={{fontSize:10,padding:'1px 8px',borderRadius:12,background:`${PHASE_COLOR[i]}18`,color:PHASE_COLOR[i],border:`1px solid ${PHASE_COLOR[i]}44`,cursor:'pointer',fontFamily:'JetBrains Mono'}}>{PHASES[i]}</span>
+                    ))}
+                  </div>
+                </div>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:24}}>
+                  {/* 어드레스 + 탑 */}
+                  {['address','top'].map((k,pi)=>{
+                    const m=poseData[k];
+                    if (!m) return null;
+                    return (
+                      <div key={k}>
+                        <div style={{fontSize:12,fontWeight:600,color:PHASE_COLOR[pi],marginBottom:10}}>
+                          {PHASE_EMOJI[pi]} {PHASES[pi]} 관절 수치
+                        </div>
+                        {Object.entries(m).map(([mk,val])=>(
+                          val!=null && <MetricBar key={mk} metricKey={mk} value={val}/>
+                        ))}
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{marginTop:16,display:'grid',gridTemplateColumns:'1fr 1fr',gap:24}}>
+                  {['impact','follow'].map((k,ki)=>{
+                    const m=poseData[k];
+                    if (!m) return null;
+                    return (
+                      <div key={k}>
+                        <div style={{fontSize:12,fontWeight:600,color:PHASE_COLOR[ki+2],marginBottom:10}}>
+                          {PHASE_EMOJI[ki+2]} {PHASES[ki+2]} 관절 수치
+                        </div>
+                        {Object.entries(m).map(([mk,val])=>(
+                          val!=null && <MetricBar key={mk} metricKey={mk} value={val}/>
+                        ))}
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{marginTop:12,fontSize:11,color:'var(--dim)',padding:'8px 12px',borderRadius:6,background:'var(--s2)'}}>
+                  <span style={{color:'rgba(34,197,94,.5)'}}>■</span> 녹색 범위 = 이상적 구간 &nbsp;·&nbsp; 수치가 범위 내면 ✓ 정상
+                </div>
+              </div>
+            )}
+
+            {/* ── 피드백 + Good/Drill ── */}
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,marginBottom:16}}>
+              <div>
+                <div style={{fontSize:13,fontWeight:700,color:'#fff',marginBottom:10}}>🎯 우선순위 피드백</div>
+                {result.critical?.map((item,i)=><FeedbackCard key={'c'+i} item={item} priority="critical"/>)}
+                {result.important?.map((item,i)=><FeedbackCard key={'i'+i} item={item} priority="important"/>)}
+                {result.optional?.map((item,i)=><FeedbackCard key={'o'+i} item={item} priority="optional"/>)}
+                <div style={{marginTop:12,padding:'10px 12px',borderRadius:8,background:'var(--s2)',border:'1px solid var(--bd)'}}>
+                  {[{c:'var(--red)',l:'즉시 교정 (Critical)',d:'먼저 집중해야 할 핵심 문제'},
+                    {c:'var(--amber)',l:'중요 개선 (Important)',d:'Critical 해결 후 순차 교정'},
+                    {c:'#60a5fa',l:'선택 개선 (Optional)',d:'완성도를 높이는 세부 조정'}
+                  ].map((r,i)=>(
+                    <div key={i} style={{display:'flex',alignItems:'flex-start',gap:8,marginBottom:i<2?7:0}}>
+                      <div style={{width:3,height:28,background:r.c,borderRadius:2,flexShrink:0,marginTop:2}}/>
+                      <div>
+                        <div style={{fontSize:11,fontWeight:600,color:r.c}}>{r.l}</div>
+                        <div style={{fontSize:10,color:'var(--dim)'}}>{r.d}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <div style={{fontSize:13,fontWeight:700,color:'#fff',marginBottom:10}}>✅ 잘 된 점 & 연습 드릴</div>
+                <div className="fb-good" style={{borderRadius:8,padding:'12px 14px',marginBottom:10}}>
+                  <div style={{fontSize:13,fontWeight:600,color:'var(--green)',marginBottom:7}}>👍 잘 된 점</div>
+                  {result.goodPoints?.map((pt,i)=>(
+                    <div key={i} style={{fontSize:12,color:'var(--muted)',marginBottom:5,display:'flex',gap:7,lineHeight:1.7}}>
+                      <span style={{color:'var(--green)',flexShrink:0}}>✓</span>{pt}
+                    </div>
+                  ))}
+                </div>
+                <div className="fb-drill" style={{borderRadius:8,padding:'12px 14px'}}>
+                  <div style={{fontSize:12,fontWeight:600,color:'var(--purple)',marginBottom:3}}>🏋️ 맞춤 연습 드릴</div>
+                  <div style={{fontSize:13,fontWeight:700,color:'#fff',marginBottom:6}}>{result.drillTitle}</div>
+                  <div style={{fontSize:12,color:'var(--muted)',lineHeight:1.85}}>{result.drillDesc}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* HFE note */}
+            <div style={{padding:'12px 16px',borderRadius:10,background:'rgba(168,85,247,.05)',border:'1px solid rgba(168,85,247,.2)'}}>
+              <div style={{fontSize:11,color:'var(--purple)',fontWeight:600,marginBottom:3}}>💡 HFE 기반 분석 원칙</div>
+              <div style={{fontSize:11,color:'var(--muted)',lineHeight:1.85}}>
+                인간공학(HFE) 원칙에 따라 <strong style={{color:'#e2eaf4'}}>Critical 항목 1~2개에 집중</strong>하도록 설계되었습니다.
+                <strong style={{color:'#e2eaf4'}}> Critical → Important → Optional 순서로 단계적 교정</strong>을 권장합니다.
+                관절 수치는 MediaPipe 추정값으로 참고용이며, 전문 코치 지도와 병행하시기 바랍니다.
+              </div>
+            </div>
+          </div>
+        )}
+
+        </div>
+        )}
+
+        {/* ═══ HISTORY TAB ═══ */}
+        {tab==='history' && (
+          <div className="fade-up">
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16,flexWrap:'wrap',gap:10}}>
+              <div>
+                <div style={{fontSize:18,fontWeight:700,color:'#fff',marginBottom:3}}>📅 분석 히스토리</div>
+                <div style={{fontSize:12,color:'var(--muted)'}}>{'총 '+history.length+'회 저장됨 · 최대 20회'}</div>
+              </div>
+              {history.length > 0 && (
+                <button onClick={()=>{if(window.confirm('전체 삭제할까요?')){setHistory(hClear());}}}
+                  style={{padding:'6px 14px',borderRadius:8,fontSize:11,cursor:'pointer',
+                    background:'rgba(239,68,68,.08)',border:'1px solid rgba(239,68,68,.2)',color:'var(--red)'}}>
+                  🗑 전체 삭제
+                </button>
+              )}
+            </div>
+            {history.length === 0 ? (
+              <div style={{textAlign:'center',padding:'60px 0',color:'var(--dim)'}}>
+                <div style={{fontSize:48,marginBottom:12}}>📭</div>
+                <div style={{fontSize:15,color:'var(--muted)',marginBottom:8}}>아직 분석 기록이 없습니다</div>
+                <div style={{fontSize:13}}>분석 탭에서 스윙을 분석하면 자동 저장됩니다</div>
+                <button onClick={()=>setTab('analysis')}
+                  style={{marginTop:16,padding:'8px 20px',borderRadius:8,background:'var(--green)',
+                    border:'none',color:'#000',fontSize:13,fontWeight:700,cursor:'pointer'}}>
+                  📹 분석 시작
+                </button>
+              </div>
+            ) : (
+              <div>
+                {history.length >= 2 && (
+                  <div className="card" style={{marginBottom:16}}>
+                    <div style={{fontSize:13,fontWeight:700,color:'#fff',marginBottom:10}}>📈 점수 추이</div>
+                    <TrendChart history={history}/>
+                  </div>
+                )}
+                <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))',gap:10}}>
+                  {history.map(s => (
+                    <HistCard key={s.id} s={s} selMode={false}
+                      isA={!!(cmpSel.a && cmpSel.a.id===s.id)}
+                      isB={!!(cmpSel.b && cmpSel.b.id===s.id)}
+                      onSel={()=>{}} onDel={id=>setHistory(hDel(id))}/>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ═══ COMPARE TAB ═══ */}
+        {tab==='compare' && (
+          <div className="fade-up">
+            <div style={{fontSize:18,fontWeight:700,color:'#fff',marginBottom:6}}>⚖️ Before / After 비교</div>
+            <div style={{fontSize:12,color:'var(--muted)',marginBottom:14}}>히스토리에서 A·B 각각 선택하세요</div>
+            {history.length < 2 ? (
+              <div style={{textAlign:'center',padding:'40px',background:'var(--s1)',borderRadius:12,border:'1px solid var(--bd)'}}>
+                <div style={{fontSize:40,marginBottom:10}}>📊</div>
+                <div style={{fontSize:14,color:'var(--muted)',marginBottom:6}}>비교할 기록이 2개 이상 필요합니다</div>
+                <button onClick={()=>setTab('analysis')}
+                  style={{padding:'8px 20px',borderRadius:8,background:'var(--green)',border:'none',
+                    color:'#000',fontSize:12,fontWeight:700,cursor:'pointer'}}>📹 분석하기</button>
+              </div>
+            ) : (
+              <div>
+                <div className="card" style={{marginBottom:14}}>
+                  <div style={{fontSize:12,fontWeight:600,color:'#fff',marginBottom:8}}>
+                    {'세션 선택 — '+(!cmpSel.a?'A 선택':!cmpSel.b?'B 선택':'비교 준비 완료 ✓')}
+                  </div>
+                  <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))',gap:8,maxHeight:300,overflowY:'auto'}}>
+                    {history.map(s => (
+                      <HistCard key={s.id} s={s} selMode={true}
+                        isA={!!(cmpSel.a && cmpSel.a.id===s.id)}
+                        isB={!!(cmpSel.b && cmpSel.b.id===s.id)}
+                        onSel={sel=>{setCmpSel(prev=>{
+                          if(prev.a&&prev.a.id===sel.id) return {...prev,a:null};
+                          if(prev.b&&prev.b.id===sel.id) return {...prev,b:null};
+                          if(!prev.a) return {...prev,a:sel};
+                          if(!prev.b) return {...prev,b:sel};
+                          return {a:sel,b:null};
+                        });}}
+                        onDel={id=>setHistory(hDel(id))}/>
+                    ))}
+                  </div>
+                </div>
+                {cmpSel.a && cmpSel.b && (
+                  <div className="fade-up">
+                    <div className="card" style={{marginBottom:14}}>
+                      <div style={{display:'flex',alignItems:'flex-start',gap:20,flexWrap:'wrap'}}>
+                        <div style={{flex:1,minWidth:220}}>
+                          <div style={{fontSize:13,fontWeight:700,color:'#fff',marginBottom:10}}>종합 점수 변화</div>
+                          <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:14}}>
+                            <div style={{textAlign:'center'}}>
+                              <div style={{fontSize:11,color:'var(--muted)',marginBottom:3}}>A (Before)</div>
+                              <span style={{fontFamily:'JetBrains Mono',fontSize:32,fontWeight:900,color:'#22c55e'}}>{cmpSel.a.totalScore}</span>
+                            </div>
+                            <span style={{fontSize:24,color:'var(--dim)'}}>{'→'}</span>
+                            <div style={{textAlign:'center'}}>
+                              <div style={{fontSize:11,color:'var(--muted)',marginBottom:3}}>B (After)</div>
+                              <span style={{fontFamily:'JetBrains Mono',fontSize:32,fontWeight:900,color:'#06b6d4'}}>{cmpSel.b.totalScore}</span>
+                            </div>
+                            <span style={{fontSize:20,fontWeight:700,color:cmpSel.b.totalScore>cmpSel.a.totalScore?'var(--green)':cmpSel.b.totalScore<cmpSel.a.totalScore?'var(--red)':'var(--muted)'}}>
+                              {'('+(cmpSel.b.totalScore>=cmpSel.a.totalScore?'+':'')+(cmpSel.b.totalScore-cmpSel.a.totalScore)+')'}
+                            </span>
+                          </div>
+                          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:7}}>
+                            {Object.keys(DOMAIN).map(k => {
+                              const d=DOMAIN[k];
+                              const va=cmpSel.a.scores[k]||0, vb=cmpSel.b.scores[k]||0;
+                              const diff=vb-va;
+                              const col=diff>0?'var(--green)':diff<0?'var(--red)':'var(--muted)';
+                              return (
+                                <div key={k} style={{padding:'6px 8px',borderRadius:7,background:'var(--s2)',border:'1px solid '+d.color+'22'}}>
+                                  <div style={{fontSize:9,color:'var(--muted)',marginBottom:2}}>{d.icon} {d.label}</div>
+                                  <div style={{display:'flex',alignItems:'baseline',gap:4}}>
+                                    <span style={{fontFamily:'JetBrains Mono',fontSize:13,fontWeight:700,color:'#22c55e'}}>{va}</span>
+                                    <span style={{fontSize:9,color:'var(--dim)'}}>{'→'}</span>
+                                    <span style={{fontFamily:'JetBrains Mono',fontSize:13,fontWeight:700,color:'#06b6d4'}}>{vb}</span>
+                                    <span style={{fontSize:10,fontWeight:700,color:col,marginLeft:'auto'}}>{(diff>=0?'+':'')+diff}</span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                        <div style={{flexShrink:0,textAlign:'center'}}>
+                          <div style={{fontSize:11,color:'var(--muted)',marginBottom:6}}>레이더 비교</div>
+                          <CmpRadar sA={cmpSel.a} sB={cmpSel.b}/>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ═══ PRO REFERENCE TAB ═══ */}
+        {tab==='proref' && (
+          <ProReferencePanel
+            myScores={result ? result.scores : (history[0] ? history[0].scores : null)}
+            myPoseData={
+              poseData && Object.keys(poseData).length > 0
+                ? poseData
+                : (history[0] && history[0].poseData ? history[0].poseData : null)
+            }
+          />
+        )}
+
+      </div>
+
+      {/* 숨김 ref 비디오 */}
+      {videoUrl && (
+        <video ref={videoRef} src={videoUrl} preload="auto" muted playsInline
+          style={{position:'fixed',top:-9999,left:-9999,width:1,height:1,opacity:0,pointerEvents:'none'}}/>
+      )}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
